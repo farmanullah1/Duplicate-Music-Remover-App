@@ -18,5 +18,6 @@ data class ScanProgress(
     val reclaimableSizeBytes: Long = 0L
 ) {
     val progressFraction: Float
-        get() = if (totalCount > 0) processedCount.toFloat() / totalCount else 0f
+        get() = if (totalCount > 0) (processedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 }
+

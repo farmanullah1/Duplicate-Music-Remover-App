@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.ScanPhase
@@ -78,7 +81,8 @@ fun ScanProgressHeader(
             .testTag("scan_progress_header"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        border = BorderStroke(1.dp, PrimaryIndigo.copy(alpha = 0.25f))
     ) {
         Box(
             modifier = Modifier
@@ -156,18 +160,21 @@ fun ScanProgressHeader(
                         )
                         if (progress.totalCount > 0) {
                             Text(
-                                text = " (${progress.processedCount}/${progress.totalCount} files)",
+                                text = " • ${progress.processedCount} of ${progress.totalCount} audio files scanned",
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
 
                     if (progress.currentFile.isNotEmpty()) {
                         Text(
-                            text = "Processing: ${progress.currentFile}",
+                            text = "Scanning: ${progress.currentFile}",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
@@ -177,13 +184,14 @@ fun ScanProgressHeader(
                     LinearProgressIndicator(
                         progress = { progress.progressFraction },
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .height(8.dp)
-                            .clip(CircleShape)
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(5.dp))
                             .testTag("scanner_progress_bar"),
                         color = PrimaryCyan,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
+
                 } else {
                     // Completed / Ready Dashboard Summary
                     val reclaimableMb = progress.reclaimableSizeBytes / (1024.0 * 1024.0)
@@ -232,6 +240,7 @@ fun ScanProgressHeader(
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier
                                 .weight(1f)
+                                .heightIn(min = 48.dp)
                                 .testTag("start_scan_button")
                         ) {
                             Icon(
@@ -250,6 +259,7 @@ fun ScanProgressHeader(
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .weight(1.2f)
+                                    .heightIn(min = 48.dp)
                                     .testTag("auto_clean_all_button")
                             ) {
                                 Icon(
@@ -270,17 +280,26 @@ fun ScanProgressHeader(
 
 @Composable
 private fun StatBadge(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = value,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

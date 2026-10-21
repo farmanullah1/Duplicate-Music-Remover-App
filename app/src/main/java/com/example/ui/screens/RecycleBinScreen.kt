@@ -3,8 +3,10 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,9 +17,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -166,22 +170,31 @@ fun RecycleBinScreen(
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
-        // Recycle Bin Summary Header & Action Bar
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .testTag("recycle_bin_summary_header"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (activeSelectionMode) PrimaryCyan.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                .fillMaxSize()
+                .widthIn(max = 1000.dp)
+                .padding(16.dp)
         ) {
+            // Recycle Bin Summary Header & Action Bar
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("recycle_bin_summary_header"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (activeSelectionMode) PrimaryCyan.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (activeSelectionMode) PrimaryCyan.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -254,6 +267,7 @@ fun RecycleBinScreen(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .weight(1f)
+                                .heightIn(min = 44.dp)
                                 .testTag("batch_restore_button")
                         ) {
                             Icon(
@@ -273,6 +287,7 @@ fun RecycleBinScreen(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .weight(1f)
+                                .heightIn(min = 44.dp)
                                 .testTag("batch_delete_button")
                         ) {
                             Icon(
@@ -309,7 +324,9 @@ fun RecycleBinScreen(
                                 OutlinedButton(
                                     onClick = { isSelectionMode = true },
                                     shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.testTag("batch_select_toggle_button")
+                                    modifier = Modifier
+                                        .heightIn(min = 40.dp)
+                                        .testTag("batch_select_toggle_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.LibraryAddCheck,
@@ -324,7 +341,9 @@ fun RecycleBinScreen(
                                     onClick = { showEmptyBinDialog = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = CrimsonDelete),
                                     shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.testTag("empty_recycle_bin_button")
+                                    modifier = Modifier
+                                        .heightIn(min = 40.dp)
+                                        .testTag("empty_recycle_bin_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteSweep,
@@ -351,6 +370,7 @@ fun RecycleBinScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
                                 .padding(12.dp)
                                 .testTag("stat_marked_files")
                         ) {
@@ -386,6 +406,7 @@ fun RecycleBinScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)), RoundedCornerShape(14.dp))
                                 .padding(12.dp)
                                 .testTag("stat_storage_occupied")
                         ) {
@@ -481,6 +502,7 @@ fun RecycleBinScreen(
         }
     }
 }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -512,6 +534,10 @@ private fun TrashedItemCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) PrimaryCyan.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) PrimaryCyan else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
     ) {
         Row(

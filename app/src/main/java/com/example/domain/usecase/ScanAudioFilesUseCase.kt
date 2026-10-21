@@ -8,8 +8,10 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.AudioFileEntity
 import com.example.model.AudioFile
 import com.example.model.ScanConfig
+import com.example.model.ScanPhase
 import com.example.util.AudioHashUtility
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -20,14 +22,14 @@ class ScanAudioFilesUseCase(private val context: Context) {
 
     suspend fun execute(
         config: ScanConfig,
-        onProgress: (scannedCount: Int, currentFile: String) -> Unit = { _, _ -> }
+        onProgress: (phase: ScanPhase, scannedCount: Int, totalCount: Int, currentFile: String) -> Unit = { _, _, _, _ -> }
     ): List<AudioFile> = withContext(Dispatchers.IO) {
         val scannedList = mutableListOf<AudioFile>()
 
         // 1. Query MediaStore
         try {
-            val mediaStoreFiles = scanMediaStore(config.minSizeBytes, config.minDurationMs) { count, name ->
-                onProgress(count, name)
+            val mediaStoreFiles = scanMediaStore(config.minSizeBytes, config.minDurationMs) { count, total, name ->
+                onProgress(ScanPhase.SCANNING_STORAGE, count, total, name)
             }
             scannedList.addAll(mediaStoreFiles)
         } catch (e: Exception) {
@@ -36,7 +38,14 @@ class ScanAudioFilesUseCase(private val context: Context) {
 
         // 2. Include demo tracks if requested or if no real files found
         if (config.includeDemoTracks || scannedList.isEmpty()) {
-            scannedList.addAll(getDemoAudioTracks())
+            val demoTracks = getDemoAudioTracks()
+            val baseCount = scannedList.size
+            val demoTotal = baseCount + demoTracks.size
+            for ((idx, track) in demoTracks.withIndex()) {
+                delay(30)
+                onProgress(ScanPhase.SCANNING_STORAGE, baseCount + idx + 1, demoTotal, track.displayName)
+            }
+            scannedList.addAll(demoTracks)
         }
 
         // 3. Filter by folder, format, min size, and min duration
@@ -52,9 +61,12 @@ class ScanAudioFilesUseCase(private val context: Context) {
             matchesFolder && matchesFormat && matchesMinSize && matchesMinDuration
         }
 
+        val totalFiles = filteredFiles.size
+
         // 4. Calculate SHA-256 hashes for real files asynchronously
         val filesWithHashes = filteredFiles.mapIndexed { index, audioFile ->
-            onProgress(index + 1, audioFile.displayName)
+            delay(25)
+            onProgress(ScanPhase.COMPUTING_HASHES, index + 1, totalFiles, audioFile.displayName)
             val hash = if (!audioFile.isDemoFile && audioFile.absolutePath.isNotEmpty()) {
                 val hashResult = AudioHashUtility.calculatePartialSha256(File(audioFile.absolutePath))
                 if (hashResult.isNotEmpty()) hashResult else audioFile.contentHash
@@ -79,10 +91,10 @@ class ScanAudioFilesUseCase(private val context: Context) {
         return audioFileDao.getPagingSource()
     }
 
-    private fun scanMediaStore(
+    private suspend fun scanMediaStore(
         minSizeBytes: Long,
         minDurationMs: Long,
-        onProgress: (Int, String) -> Unit
+        onProgress: (Int, Int, String) -> Unit
     ): List<AudioFile> {
         val files = mutableListOf<AudioFile>()
         val projection = arrayOf(
@@ -108,6 +120,7 @@ class ScanAudioFilesUseCase(private val context: Context) {
             selectionArgs,
             sortOrder
         )?.use { cursor ->
+            val totalCursor = cursor.count
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
             val pathCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
@@ -153,8 +166,10 @@ class ScanAudioFilesUseCase(private val context: Context) {
                 )
                 files.add(audioFile)
                 count++
-                onProgress(count, displayName)
+                delay(15)
+                onProgress(count, totalCursor, displayName)
             }
+
         }
         return files
     }

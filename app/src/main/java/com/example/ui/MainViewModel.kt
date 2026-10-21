@@ -49,6 +49,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    val allScannedFiles: StateFlow<List<AudioFile>> = repository.allScannedFiles
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    fun updateAudioFileMetadata(updatedFile: AudioFile) {
+        viewModelScope.launch {
+            val updated = _duplicateGroups.value.map { group ->
+                val files = group.files.map { if (it.id == updatedFile.id) updatedFile else it }
+                group.copy(files = files)
+            }
+            _duplicateGroups.value = updated
+
+            if (_selectedGroupForCompare.value != null) {
+                val compId = _selectedGroupForCompare.value!!.groupId
+                _selectedGroupForCompare.value = updated.find { it.groupId == compId }
+            }
+
+            repository.updateAudioFileMetadata(updatedFile)
+            _userMessage.value = "Updated metadata tags for '${updatedFile.displayName}'"
+        }
+    }
+
+    fun onAiTrackExported(audioFile: AudioFile) {
+        viewModelScope.launch {
+            repository.updateAudioFileMetadata(audioFile)
+            _userMessage.value = "AI track '${audioFile.displayName}' saved to library & ready in scanner!"
+            startScan()
+        }
+    }
+
     init {
         // Initial quick scan on launch with default demo + local files
         startScan()
@@ -156,6 +189,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    fun deleteSelectedDuplicates(audioFiles: List<AudioFile>, permanent: Boolean = false) {
+        viewModelScope.launch {
+            audioPlayerController.stop()
+            if (audioFiles.isEmpty()) return@launch
+
+            val targetIds = audioFiles.map { it.id }.toSet()
+            val totalBytes = audioFiles.sumOf { it.sizeBytes }
+            val formattedBytes = run {
+                val mb = totalBytes / (1024.0 * 1024.0)
+                if (mb >= 1000) String.format("%.2f GB", mb / 1024.0) else String.format("%.1f MB", mb)
+            }
+
+            val intentSender = if (permanent) {
+                repository.deleteFilesDirectBatchFromDevice(audioFiles)
+            } else {
+                repository.moveToTrashBatch(audioFiles)
+            }
+
+            // Remove files from memory state
+            val updatedList = _duplicateGroups.value.mapNotNull { g ->
+                val remainingFiles = g.files.filter { it.id !in targetIds }
+                if (remainingFiles.size > 1) {
+                    val newKeepId = if (remainingFiles.any { it.id == g.autoRecommendedKeepId }) {
+                        g.autoRecommendedKeepId
+                    } else {
+                        remainingFiles.first().id
+                    }
+                    g.copy(files = remainingFiles, autoRecommendedKeepId = newKeepId)
+                } else {
+                    null // Group resolved
+                }
+            }
+
+            _duplicateGroups.value = updatedList
+            if (_selectedGroupForCompare.value != null) {
+                val compareId = _selectedGroupForCompare.value?.groupId
+                _selectedGroupForCompare.value = updatedList.find { it.groupId == compareId }
+            }
+
+            if (intentSender != null) {
+                _pendingIntentSender.value = IntentSenderRequest.Builder(intentSender).build()
+            } else {
+                _userMessage.value = if (permanent) {
+                    "Permanently removed ${audioFiles.size} duplicate file(s) ($formattedBytes freed)."
+                } else {
+                    "Moved ${audioFiles.size} duplicate file(s) to Recycle Bin ($formattedBytes freed)."
+                }
+            }
+        }
+    }
+
 
     fun autoSelectAllRecommendedDuplicates() {
         viewModelScope.launch {

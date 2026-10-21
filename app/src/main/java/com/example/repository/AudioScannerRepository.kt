@@ -22,6 +22,7 @@ import com.example.util.MediaStoreDeleteHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
@@ -38,6 +39,13 @@ class AudioScannerRepository(private val context: Context) {
 
     val recycleBinItems: Flow<List<RecycleBinEntity>> = recycleBinDao.getAllTrashedItems()
 
+    val allScannedFiles: Flow<List<AudioFile>> = audioFileDao.getAllAudioFilesFlow()
+        .map { entities -> entities.map { it.toDomain() } }
+
+    suspend fun updateAudioFileMetadata(audioFile: AudioFile) = withContext(Dispatchers.IO) {
+        audioFileDao.insert(AudioFileEntity.fromDomain(audioFile))
+    }
+
     fun getAudioFilesPagingSource(): PagingSource<Int, AudioFileEntity> {
         return scanAudioFilesUseCase.getPagingSource()
     }
@@ -47,21 +55,29 @@ class AudioScannerRepository(private val context: Context) {
         onProgress: (ScanProgress) -> Unit
     ): List<DuplicateGroup> = withContext(Dispatchers.IO) {
 
-        onProgress(ScanProgress(phase = ScanPhase.SCANNING_STORAGE, processedCount = 0, totalCount = 0))
+        onProgress(ScanProgress(phase = ScanPhase.SCANNING_STORAGE, processedCount = 0, totalCount = 0, currentFile = "Initializing storage scan..."))
 
-        val filesWithHashes = scanAudioFilesUseCase.execute(config) { count, currentName ->
+        val filesWithHashes = scanAudioFilesUseCase.execute(config) { phase, count, total, currentName ->
             onProgress(
                 ScanProgress(
-                    phase = ScanPhase.SCANNING_STORAGE,
+                    phase = phase,
                     processedCount = count,
-                    totalCount = count,
+                    totalCount = total,
                     currentFile = currentName
                 )
             )
         }
 
         val totalFiles = filesWithHashes.size
-        onProgress(ScanProgress(phase = ScanPhase.GROUPING_DUPLICATES, processedCount = totalFiles, totalCount = totalFiles))
+        onProgress(
+            ScanProgress(
+                phase = ScanPhase.GROUPING_DUPLICATES,
+                processedCount = totalFiles,
+                totalCount = totalFiles,
+                currentFile = "Grouping duplicate audio tracks & identifying originals..."
+            )
+        )
+        kotlinx.coroutines.delay(120)
 
         // 4. Load Whitelisted Pairs to exclude
         val whitelistedPairs = try {

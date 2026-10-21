@@ -23,6 +23,9 @@ interface AudioFileDao {
     suspend fun getCount(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(file: AudioFileEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(files: List<AudioFileEntity>)
 
     @Query("DELETE FROM scanned_audio_files")

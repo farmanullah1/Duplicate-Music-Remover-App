@@ -1,10 +1,12 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,10 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Surface
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FilterList
@@ -60,12 +64,14 @@ import com.example.model.ScanConfig
 import com.example.model.ScanProgress
 import com.example.ui.components.DuplicateGroupCard
 import com.example.ui.components.ScanProgressHeader
+import com.example.ui.components.StorageBreakdownChart
 import com.example.ui.components.StoragePermissionCard
 import com.example.util.PermissionUtils
 import androidx.compose.ui.platform.LocalContext
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.PrimaryCyan
 import com.example.ui.theme.PrimaryIndigo
+import androidx.compose.runtime.remember
 
 @Composable
 fun ScanDashboardScreen(
@@ -73,6 +79,7 @@ fun ScanDashboardScreen(
     scanProgress: ScanProgress,
     duplicateGroups: List<DuplicateGroup>,
     recycleBinItems: List<RecycleBinEntity>,
+    allScannedFiles: List<AudioFile> = emptyList(),
     onUpdateConfig: (ScanConfig) -> Unit,
     onStartScan: () -> Unit,
     onAutoCleanAll: () -> Unit,
@@ -83,145 +90,202 @@ fun ScanDashboardScreen(
     val context = LocalContext.current
     val hasStoragePermission = PermissionUtils.hasStoragePermission(context)
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    val filesForAnalytics = remember(allScannedFiles, duplicateGroups) {
+        if (allScannedFiles.isNotEmpty()) allScannedFiles
+        else duplicateGroups.flatMap { it.files }.distinctBy { it.id }
+    }
+
+    BoxWithConstraints(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
-        if (!hasStoragePermission && !scanConfig.includeDemoTracks) {
-            StoragePermissionCard(
-                onPermissionGranted = onStartScan,
-                onEnableDemoMode = {
-                    onUpdateConfig(scanConfig.copy(includeDemoTracks = true))
-                    onStartScan()
-                }
-            )
-        }
+        val isWide = maxWidth >= 840.dp
 
-        // Top Real-Time Scanner Header
-        ScanProgressHeader(
-            progress = scanProgress,
-            onStartScan = onStartScan,
-            onAutoCleanAll = onAutoCleanAll
-        )
-
-        // Storage Space Recovered Dashboard Component
-        StorageRecoveredDashboardCard(
-            recycleBinItems = recycleBinItems,
-            scanProgress = scanProgress
-        )
-
-        // Scanner Filter Options Component (Folder, Min Size, Audio Formats)
-        ScannerFiltersCard(
-            scanConfig = scanConfig,
-            onUpdateConfig = onUpdateConfig,
-            onStartScan = onStartScan
-        )
-
-        // Duplicate Detection Strategies Card
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .testTag("detection_strategies_card"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                .fillMaxSize()
+                .widthIn(max = 1000.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
+            if (!hasStoragePermission && !scanConfig.includeDemoTracks) {
+                StoragePermissionCard(
+                    onPermissionGranted = onStartScan,
+                    onEnableDemoMode = {
+                        onUpdateConfig(scanConfig.copy(includeDemoTracks = true))
+                        onStartScan()
+                    }
+                )
+            }
+
+            if (isWide) {
+                // Adaptive 2-Column top section for tablets & wide screens
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        ScanProgressHeader(
+                            progress = scanProgress,
+                            onStartScan = onStartScan,
+                            onAutoCleanAll = onAutoCleanAll
+                        )
+                        StorageRecoveredDashboardCard(
+                            recycleBinItems = recycleBinItems,
+                            scanProgress = scanProgress
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (filesForAnalytics.isNotEmpty()) {
+                            StorageBreakdownChart(
+                                allFiles = filesForAnalytics,
+                                duplicateGroups = duplicateGroups
+                            )
+                        }
+                        ScannerFiltersCard(
+                            scanConfig = scanConfig,
+                            onUpdateConfig = onUpdateConfig,
+                            onStartScan = onStartScan
+                        )
+                    }
+                }
+            } else {
+                // Single Column for Mobile Screens
+                ScanProgressHeader(
+                    progress = scanProgress,
+                    onStartScan = onStartScan,
+                    onAutoCleanAll = onAutoCleanAll
+                )
+
+                StorageRecoveredDashboardCard(
+                    recycleBinItems = recycleBinItems,
+                    scanProgress = scanProgress
+                )
+
+                if (filesForAnalytics.isNotEmpty()) {
+                    StorageBreakdownChart(
+                        allFiles = filesForAnalytics,
+                        duplicateGroups = duplicateGroups
+                    )
+                }
+
+                ScannerFiltersCard(
+                    scanConfig = scanConfig,
+                    onUpdateConfig = onUpdateConfig,
+                    onStartScan = onStartScan
+                )
+            }
+
+            // Duplicate Detection Strategies Card
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .testTag("detection_strategies_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = "Strategies",
-                        tint = PrimaryIndigo,
-                        modifier = Modifier.size(22.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Strategies",
+                            tint = PrimaryIndigo,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Detection Strategy Rules",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+
+                    // Strategy 1: Filename Matching
+                    StrategyToggleItem(
+                        title = "Filename & Numbered Suffixes",
+                        subtitle = "Matches 'vardan.mp3' with 'vardan(1).mp3', 'song (copy)', or numbered variations.",
+                        icon = Icons.Default.Folder,
+                        checked = scanConfig.enableFilenameMatching,
+                        onCheckedChange = {
+                            onUpdateConfig(scanConfig.copy(enableFilenameMatching = it))
+                            onStartScan()
+                        },
+                        testTag = "toggle_filename_matching"
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Strategy 2: ID3 Metadata Matching
+                    StrategyToggleItem(
+                        title = "Embedded ID3 Metadata",
+                        subtitle = "Compares Title, Artist, Album, and Duration embedded tags.",
+                        icon = Icons.Default.Sell,
+                        checked = scanConfig.enableMetadataMatching,
+                        onCheckedChange = {
+                            onUpdateConfig(scanConfig.copy(enableMetadataMatching = it))
+                            onStartScan()
+                        },
+                        testTag = "toggle_metadata_matching"
+                    )
+
+                    // Strategy 3: SHA-256 Audio Content Hashing
+                    StrategyToggleItem(
+                        title = "Content Hash Fingerprinting",
+                        subtitle = "Catches exact bit-for-bit duplicate audio data even if names/tags differ.",
+                        icon = Icons.Default.Fingerprint,
+                        checked = scanConfig.enableContentHash,
+                        onCheckedChange = {
+                            onUpdateConfig(scanConfig.copy(enableContentHash = it))
+                            onStartScan()
+                        },
+                        testTag = "toggle_content_hash"
+                    )
+                }
+            }
+
+            // Preview of Top Duplicate Groups
+            if (duplicateGroups.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "Detection Strategy Rules",
+                        text = "Detected Duplicate Groups",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        text = "${duplicateGroups.size} Groups",
+                        fontSize = 12.sp,
+                        color = PrimaryCyan,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                // Strategy 1: Filename Matching
-                StrategyToggleItem(
-                    title = "Filename & Numbered Suffixes",
-                    subtitle = "Matches 'vardan.mp3' with 'vardan(1).mp3', 'song (copy)', or numbered variations.",
-                    icon = Icons.Default.Folder,
-                    checked = scanConfig.enableFilenameMatching,
-                    onCheckedChange = {
-                        onUpdateConfig(scanConfig.copy(enableFilenameMatching = it))
-                        onStartScan()
-                    },
-                    testTag = "toggle_filename_matching"
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-
-                // Strategy 2: ID3 Metadata Matching
-                StrategyToggleItem(
-                    title = "Embedded ID3 Metadata",
-                    subtitle = "Compares Title, Artist, Album, and Duration embedded tags.",
-                    icon = Icons.Default.Sell,
-                    checked = scanConfig.enableMetadataMatching,
-                    onCheckedChange = {
-                        onUpdateConfig(scanConfig.copy(enableMetadataMatching = it))
-                        onStartScan()
-                    },
-                    testTag = "toggle_metadata_matching"
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-
-                // Strategy 3: SHA-256 Audio Content Hashing
-                StrategyToggleItem(
-                    title = "Content Hash Fingerprinting",
-                    subtitle = "Catches exact bit-for-bit duplicate audio data even if names/tags differ.",
-                    icon = Icons.Default.Fingerprint,
-                    checked = scanConfig.enableContentHash,
-                    onCheckedChange = {
-                        onUpdateConfig(scanConfig.copy(enableContentHash = it))
-                        onStartScan()
-                    },
-                    testTag = "toggle_content_hash"
-                )
-            }
-        }
-
-        // Preview of Top Duplicate Groups
-        if (duplicateGroups.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Detected Duplicate Groups",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-                Text(
-                    text = "${duplicateGroups.size} Groups",
-                    fontSize = 12.sp,
-                    color = PrimaryCyan,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            duplicateGroups.take(5).forEach { group ->
-                DuplicateGroupCard(
-                    group = group,
-                    onCompare = { onCompareGroup(group) },
-                    onQuickDeleteDuplicate = { audioFile, permanent -> onQuickDelete(group, audioFile, permanent) }
-                )
+                duplicateGroups.take(5).forEach { group ->
+                    DuplicateGroupCard(
+                        group = group,
+                        onCompare = { onCompareGroup(group) },
+                        onQuickDeleteDuplicate = { audioFile, permanent -> onQuickDelete(group, audioFile, permanent) }
+                    )
+                }
             }
         }
     }
@@ -243,7 +307,8 @@ fun StorageRecoveredDashboardCard(
             .testTag("storage_recovered_dashboard_card"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, EmeraldKeep.copy(alpha = 0.35f))
     ) {
         Column(
             modifier = Modifier
@@ -260,7 +325,8 @@ fun StorageRecoveredDashboardCard(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(EmeraldKeep.copy(alpha = 0.15f)),
+                            .background(EmeraldKeep.copy(alpha = 0.15f))
+                            .border(BorderStroke(1.dp, EmeraldKeep.copy(alpha = 0.3f)), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -295,6 +361,7 @@ fun StorageRecoveredDashboardCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(EmeraldKeep.copy(alpha = 0.08f))
+                    .border(BorderStroke(1.dp, EmeraldKeep.copy(alpha = 0.25f)), RoundedCornerShape(14.dp))
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -344,6 +411,7 @@ fun StorageRecoveredDashboardCard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
@@ -373,7 +441,9 @@ fun ScannerFiltersCard(
             .fillMaxWidth()
             .testTag("scanner_filters_card"),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
@@ -439,6 +509,11 @@ fun ScannerFiltersCard(
                             selectedLabelColor = Color.White,
                             selectedLeadingIconColor = Color.White
                         ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
                         modifier = Modifier.testTag("filter_folder_$folderKey")
                     )
                 }
@@ -485,6 +560,11 @@ fun ScannerFiltersCard(
                             selectedContainerColor = PrimaryIndigo,
                             selectedLabelColor = Color.White,
                             selectedLeadingIconColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         ),
                         modifier = Modifier.testTag("filter_size_$sizeBytes")
                     )
@@ -533,6 +613,11 @@ fun ScannerFiltersCard(
                             selectedLabelColor = Color.White,
                             selectedLeadingIconColor = Color.White
                         ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
                         modifier = Modifier.testTag("filter_format_$formatKey")
                     )
                 }
@@ -550,38 +635,59 @@ private fun StrategyToggleItem(
     onCheckedChange: (Boolean) -> Unit,
     testTag: String
 ) {
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        shape = RoundedCornerShape(12.dp),
+        color = if (checked) PrimaryIndigo.copy(alpha = 0.06f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, if (checked) PrimaryIndigo.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = PrimaryCyan,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp
-            )
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (checked) PrimaryIndigo.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
+                    .border(BorderStroke(1.dp, if (checked) PrimaryIndigo.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = if (checked) PrimaryIndigo else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = PrimaryIndigo,
+                    checkedTrackColor = PrimaryIndigo.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.testTag(testTag)
             )
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = PrimaryIndigo,
-                checkedTrackColor = PrimaryIndigo.copy(alpha = 0.3f)
-            ),
-            modifier = Modifier.testTag(testTag)
-        )
     }
 }
 

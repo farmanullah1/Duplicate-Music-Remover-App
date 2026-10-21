@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +25,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -76,6 +81,7 @@ fun SideBySideCompareDialog(
     onDeleteFile: (AudioFile, Boolean) -> Unit,
     onDeleteBatchFiles: ((List<AudioFile>, Boolean) -> Unit)? = null,
     onKeepBoth: () -> Unit,
+    onEditMetadata: ((AudioFile) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val files = group.files
@@ -85,6 +91,18 @@ fun SideBySideCompareDialog(
     var keepFileId by remember(group.groupId, files.map { it.id }) { mutableStateOf(autoRecommendedKeepId) }
     var pendingDeleteFiles by remember { mutableStateOf<List<AudioFile>?>(null) }
     var pendingSingleDeleteFile by remember { mutableStateOf<AudioFile?>(null) }
+    var fileForEdit by remember { mutableStateOf<AudioFile?>(null) }
+
+    fileForEdit?.let { file ->
+        MetadataEditorDialog(
+            audioFile = file,
+            onSave = { updated ->
+                onEditMetadata?.invoke(updated)
+                fileForEdit = null
+            },
+            onDismiss = { fileForEdit = null }
+        )
+    }
 
     val filesForRemoval = remember(keepFileId, files) {
         files.filter { it.id != keepFileId }
@@ -138,8 +156,10 @@ fun SideBySideCompareDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.96f)
+                .widthIn(max = 940.dp)
                 .fillMaxHeight(0.93f)
                 .clip(RoundedCornerShape(24.dp))
+                .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)), RoundedCornerShape(24.dp))
                 .testTag("side_by_side_dialog"),
             color = MaterialTheme.colorScheme.surface
         ) {
@@ -407,6 +427,7 @@ fun SideBySideCompareDialog(
                                     comparisonBaseFile = otherFile,
                                     onSeek = onSeek,
                                     onSelectKeep = { keepFileId = file.id },
+                                    onEditTags = { fileForEdit = file },
                                     onTogglePlay = {
                                         if (onPlayGroupSynchronized != null) {
                                             onPlayGroupSynchronized(files, file)
@@ -440,6 +461,7 @@ fun SideBySideCompareDialog(
                                     comparisonBaseFile = otherFile,
                                     onSeek = onSeek,
                                     onSelectKeep = { keepFileId = file.id },
+                                    onEditTags = { fileForEdit = file },
                                     onTogglePlay = {
                                         if (onPlayGroupSynchronized != null) {
                                             onPlayGroupSynchronized(files, file)
@@ -465,6 +487,63 @@ fun SideBySideCompareDialog(
                     )
 
                     MultiFileComparisonMatrix(files = files)
+                }
+
+                // 1-Tap Pick Best Audio Fidelity Preset Button
+                val bestAudioFile = remember(files) { files.maxByOrNull { it.bitrateKbps } }
+                if (bestAudioFile != null && files.size >= 2) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { keepFileId = bestAudioFile.id },
+                        color = PrimaryCyan.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryCyan.copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.HighQuality,
+                                    contentDescription = null,
+                                    tint = PrimaryCyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Auto-Pick Highest Audio Quality",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = PrimaryCyan
+                                    )
+                                    Text(
+                                        text = "Selects '${bestAudioFile.displayName}' (${bestAudioFile.bitrateKbps} kbps • ${bestAudioFile.format})",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            if (keepFileId == bestAudioFile.id) {
+                                Surface(
+                                    color = EmeraldKeep,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "SELECTED",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
@@ -510,6 +589,7 @@ fun SideBySideCompareDialog(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
+                            .heightIn(min = 44.dp)
                             .testTag("auto_delete_duplicate_button")
                     ) {
                         Icon(
@@ -540,6 +620,7 @@ private fun FilePaneCard(
     comparisonBaseFile: AudioFile? = null,
     onSeek: ((Long) -> Unit)? = null,
     onSelectKeep: () -> Unit,
+    onEditTags: (() -> Unit)? = null,
     onTogglePlay: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -572,12 +653,30 @@ private fun FilePaneCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = paneLabel,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = paneLabel,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (onEditTags != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = onEditTags,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .testTag("edit_tags_pane_${audioFile.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Tags",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
 
                 if (isKeep) {
                     Surface(
