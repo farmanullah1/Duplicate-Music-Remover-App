@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -82,6 +83,8 @@ fun CompareScreen(
             coordinator.pause()
         }
     }
+
+    BackHandler(onBack = onNavigateBack)
 
     Scaffold(
         topBar = {

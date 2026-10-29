@@ -1,5 +1,6 @@
 package com.example.ui.recyclebin
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -53,6 +54,8 @@ fun RecycleBinScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showEmptyConfirm by remember { mutableStateOf(false) }
+
+    BackHandler(onBack = onNavigateBack)
 
     Scaffold(
         topBar = {

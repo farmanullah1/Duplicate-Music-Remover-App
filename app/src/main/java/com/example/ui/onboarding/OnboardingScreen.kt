@@ -76,8 +76,12 @@ fun OnboardingScreen(
                     1 -> OnboardingPermissionsPage(
                         storageMode = storageMode,
                         onGrantAllFiles = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            try {
                                 context.startActivity(StorageAccess.allFilesIntent(context))
+                            } catch (e: Exception) {
+                                try {
+                                    context.startActivity(StorageAccess.appDetailsIntent(context))
+                                } catch (ignored: Exception) {}
                             }
                         },
                         onGrantMedia = {

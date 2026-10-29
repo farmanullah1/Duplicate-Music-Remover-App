@@ -46,6 +46,28 @@ class SmartCleanUseCase(
 
     suspend fun execute(plan: SmartPlan, selectedPaths: Set<String>): BatchResult {
         val dupFilesToTrash = plan.exactDuplicateFiles.filter { it.path in selectedPaths }
-        return trashUseCase.trashFromGroups(mapOf(0L to dupFilesToTrash))
+        val dupResult = trashUseCase.trashFromGroups(mapOf(0L to dupFilesToTrash))
+
+        var junkFreed = 0L
+        for (junkCat in plan.junk) {
+            for (item in junkCat.items) {
+                try {
+                    val f = java.io.File(item.path)
+                    if (f.exists()) {
+                        val size = f.length()
+                        if (f.delete()) {
+                            junkFreed += size
+                        }
+                    }
+                } catch (e: Exception) {
+                }
+            }
+        }
+
+        return BatchResult(
+            succeeded = dupResult.succeeded,
+            failed = dupResult.failed,
+            bytes = dupResult.bytes + junkFreed
+        )
     }
 }

@@ -92,10 +92,19 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val triggerScan = {
+        val folder = scannedFolder
+        if (folder != null) {
+            viewModel.scanFolder(folder)
+        } else {
+            viewModel.requestScan()
+        }
+    }
+
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
-        viewModel.requestScan()
+        triggerScan()
     }
 
     var crashInfo by remember { mutableStateOf<String?>(null) }
@@ -286,8 +295,12 @@ fun HomeScreen(
                     text = stringResource(R.string.perm_all_files_desc),
                     buttonLabel = stringResource(R.string.perm_all_files_button),
                     onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        try {
                             context.startActivity(StorageAccess.allFilesIntent(context))
+                        } catch (e: Exception) {
+                            try {
+                                context.startActivity(StorageAccess.appDetailsIntent(context))
+                            } catch (ignored: Exception) {}
                         }
                     }
                 )
@@ -624,14 +637,17 @@ fun HomeScreen(
                                 PrimaryButton(
                                     text = if (scannedFolder != null) "Scan This Folder" else stringResource(R.string.home_scan_button),
                                     onClick = {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                        val hasNotif = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                                context,
+                                                android.Manifest.permission.POST_NOTIFICATIONS
+                                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                        } else true
+
+                                        if (hasNotif) {
+                                            triggerScan()
                                         } else {
-                                            if (scannedFolder != null) {
-                                                viewModel.scanFolder(scannedFolder!!)
-                                            } else {
-                                                viewModel.requestScan()
-                                            }
+                                            notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                                         }
                                     },
                                     icon = Icons.Rounded.Radar,
@@ -1114,15 +1130,27 @@ fun HomeScreen(
                     }
                 }
 
-                PrimaryButton(
-                    text = "Clean ${Formatters.formatBytes(plan.totalBytes)}",
-                    onClick = {
-                        viewModel.executeSmartClean { batch ->
-                            onShowSnackbar("Cleaned ${Formatters.formatBytes(batch.bytes)} successfully")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (plan.totalBytes > 0) {
+                    PrimaryButton(
+                        text = "Clean ${Formatters.formatBytes(plan.totalBytes)}",
+                        onClick = {
+                            viewModel.executeSmartClean { batch ->
+                                onShowSnackbar("Cleaned ${Formatters.formatBytes(batch.bytes)} successfully")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = { viewModel.clearSmartPlan() },
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        Text("Everything is already clean! (Close)")
+                    }
+                }
             }
         }
     }

@@ -124,7 +124,15 @@ fun SettingsScreen(
                     }
                     if (mode != StorageAccess.Mode.FULL && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         Button(
-                            onClick = { context.startActivity(StorageAccess.allFilesIntent(context)) },
+                            onClick = {
+                                try {
+                                    context.startActivity(StorageAccess.allFilesIntent(context))
+                                } catch (e: Exception) {
+                                    try {
+                                        context.startActivity(StorageAccess.appDetailsIntent(context))
+                                    } catch (ignored: Exception) {}
+                                }
+                            },
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text("Grant All")

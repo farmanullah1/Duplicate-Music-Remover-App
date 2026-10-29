@@ -36,9 +36,9 @@ fun rememberAnimatorScaleZero(): Boolean {
 }
 
 /** Press-down scale feedback (0.97) + ripple with double-tap protection. */
-fun Modifier.pressScaleClickable(onClick: () -> Unit): Modifier = pressScaleClickable(debounceMs = 600L, onClick = onClick)
+fun Modifier.pressScaleClickable(onClick: () -> Unit): Modifier = pressScaleClickable(debounceMs = 300L, onClick = onClick)
 
-fun Modifier.pressScaleClickable(debounceMs: Long = 600L, onClick: () -> Unit): Modifier = composed {
+fun Modifier.pressScaleClickable(debounceMs: Long = 300L, onClick: () -> Unit): Modifier = composed {
     val reduce = LocalReduceMotion.current
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()

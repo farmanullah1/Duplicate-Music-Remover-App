@@ -122,8 +122,12 @@ fun JunkScreen(
                         text = "To find and clean junk documents, temp files, cache, and empty folders, All Files Access is required.",
                         buttonLabel = stringResource(R.string.perm_all_files_button),
                         onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            try {
                                 context.startActivity(StorageAccess.allFilesIntent(context))
+                            } catch (e: Exception) {
+                                try {
+                                    context.startActivity(StorageAccess.appDetailsIntent(context))
+                                } catch (ignored: Exception) {}
                             }
                         },
                         modifier = Modifier.padding(Spacing.md)

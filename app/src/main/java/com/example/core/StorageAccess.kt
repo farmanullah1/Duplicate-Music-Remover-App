@@ -43,10 +43,15 @@ object StorageAccess {
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED
 
-    fun allFilesIntent(ctx: Context): Intent = Intent(
-        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-        Uri.parse("package:${ctx.packageName}")
-    )
+    fun allFilesIntent(ctx: Context): Intent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Intent(
+                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.parse("package:${ctx.packageName}")
+            )
+        } else {
+            appDetailsIntent(ctx)
+        }
 
     fun appDetailsIntent(ctx: Context): Intent = Intent(
         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
