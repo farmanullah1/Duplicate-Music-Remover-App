@@ -35,11 +35,12 @@ fun rememberAnimatorScaleZero(): Boolean {
     }
 }
 
-/** Press-down scale feedback (0.97) + ripple. */
-fun Modifier.pressScaleClickable(onClick: () -> Unit): Modifier = composed {
+/** Press-down scale feedback (0.97) + ripple with double-tap protection. */
+fun Modifier.pressScaleClickable(debounceMs: Long = 600L, onClick: () -> Unit): Modifier = composed {
     val reduce = LocalReduceMotion.current
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
+    var lastClickTime by remember { mutableLongStateOf(0L) }
     val s by animateFloatAsState(
         targetValue = if (pressed && !reduce) 0.97f else 1f,
         animationSpec = spring(0.6f, 800f),
@@ -51,7 +52,13 @@ fun Modifier.pressScaleClickable(onClick: () -> Unit): Modifier = composed {
     }.clickable(
         interactionSource = src,
         indication = ripple(),
-        onClick = onClick
+        onClick = {
+            val now = System.currentTimeMillis()
+            if (now - lastClickTime >= debounceMs) {
+                lastClickTime = now
+                onClick()
+            }
+        }
     )
 }
 

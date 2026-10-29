@@ -407,6 +407,41 @@ fun SettingsScreen(
             }
         }
 
+        // How matching works (file 11 §5)
+        item {
+            SafaiCard(tonal = true) {
+                Text(
+                    text = "How Matching Works",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Text(
+                        text = "• Exact duplicates: Verified byte-for-byte using cryptographic SHA-256 binary hashing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "• Similar photos: Visual perception hashing (dHash) robust to resizing, compression, and slight crops.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "• Audio tracks: Matched when embedded ID3 tags (track title + artist) and duration closely agree across bitrates or formats.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "• Copy names: Normalized filename comparison detecting copy suffixes like ' (1)', ' - Copy', and bracketed variations.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         // 7. About Card & Crash Logging
         item {
             SafaiCard(tonal = true) {

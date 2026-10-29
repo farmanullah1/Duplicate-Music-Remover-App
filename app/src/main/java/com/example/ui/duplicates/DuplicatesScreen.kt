@@ -62,6 +62,7 @@ fun DuplicatesScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scanState by com.example.data.scan.ScanStateHolder.state.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
 
     var showSortMenu by remember { mutableStateOf(false) }
@@ -151,6 +152,43 @@ fun DuplicatesScreen(
                                 viewModel.setSort(DupSort.NAME)
                                 showSortMenu = false
                             }
+                        )
+                    }
+                }
+            }
+
+            // Partial media access banner
+            if (com.example.core.StorageAccess.isPartialMediaAccess(context)) {
+                PermissionCard(
+                    title = "Partial Photo Access (Selected Only)",
+                    text = "Safai can only see the photos you selected. Allow all photos to find every duplicate.",
+                    buttonLabel = "App Settings",
+                    onClick = {
+                        context.startActivity(com.example.core.StorageAccess.appDetailsIntent(context))
+                    },
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xxs)
+                )
+            }
+
+            // Active scan indicator
+            if (scanState is com.example.data.scan.ScanState.Running) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.md, vertical = Spacing.xxs)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "Storage scan in progress… Please wait before cleaning.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
@@ -412,12 +450,16 @@ fun DuplicatesScreen(
                                 }
                             },
                             onCleanGroup = {
-                                viewModel.cleanGroup(group) { batch ->
-                                    onShowSnackbarWithAction(
-                                        "Moved ${batch.succeeded.size} files to Recycle Bin",
-                                        "Undo"
-                                    ) {
-                                        viewModel.undoTrash(batch.succeeded.map { it.id })
+                                if (scanState is com.example.data.scan.ScanState.Running) {
+                                    onShowSnackbar("Wait for the scan to finish")
+                                } else {
+                                    viewModel.cleanGroup(group) { batch ->
+                                        onShowSnackbarWithAction(
+                                            "Moved ${batch.succeeded.size} files to Recycle Bin",
+                                            "Undo"
+                                        ) {
+                                            viewModel.undoTrash(batch.succeeded.map { it.id })
+                                        }
                                     }
                                 }
                             },
@@ -477,7 +519,13 @@ fun DuplicatesScreen(
                 count = uiState.totalSelectedCount,
                 size = uiState.totalSelectedBytes,
                 onClear = { viewModel.deselectAllDuplicates() },
-                onDelete = { viewModel.setReviewSheetOpen(true) },
+                onDelete = {
+                    if (scanState is com.example.data.scan.ScanState.Running) {
+                        onShowSnackbar("Wait for the scan to finish")
+                    } else {
+                        viewModel.setReviewSheetOpen(true)
+                    }
+                },
                 modifier = Modifier.align(Alignment.BottomCenter),
                 label = "Review & Clean"
             )
