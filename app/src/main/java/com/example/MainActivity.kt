@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
                         "junk" -> navController.navigate(Route.Junk.path)
                         "storage" -> navController.navigate(Route.Storage.path)
                         "recycle_bin" -> navController.navigate(Route.RecycleBin.path)
+                        "studio", "ai_music_studio" -> navController.navigate(Route.AiMusicStudio.path)
                     }
                     initialRouteExtra = null
                 }

@@ -4,10 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.pdf.PdfRenderer
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -25,8 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -79,6 +74,8 @@ fun CompareScreen(
     val coordinator = viewModel.playerCoordinator
     val playerState by coordinator.state.collectAsStateWithLifecycle()
 
+    var fileForTagEdit by remember { mutableStateOf<MediaFile?>(null) }
+
     DisposableEffect(Unit) {
         onDispose {
             coordinator.pause()
@@ -103,75 +100,89 @@ fun CompareScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { viewModel.selectGroupIndex(uiState.currentIndex - 1) },
-                        enabled = uiState.currentIndex > 0
-                    ) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Previous Group")
+                    if (uiState.groups.size > 1) {
+                        IconButton(
+                            onClick = { viewModel.selectGroupIndex(uiState.currentIndex - 1) },
+                            enabled = uiState.currentIndex > 0
+                        ) {
+                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "Previous")
+                        }
+                        IconButton(
+                            onClick = { viewModel.selectGroupIndex(uiState.currentIndex + 1) },
+                            enabled = uiState.currentIndex < uiState.groups.size - 1
+                        ) {
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = "Next")
+                        }
                     }
-                    IconButton(
-                        onClick = { viewModel.selectGroupIndex(uiState.currentIndex + 1) },
-                        enabled = uiState.currentIndex < uiState.groups.size - 1
-                    ) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Next Group")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                }
             )
-        },
-        modifier = modifier
+        }
     ) { innerPadding ->
         if (group == null) {
-            EmptyState(
-                icon = Icons.Rounded.Compare,
-                title = "No group selected",
-                message = "Return to Duplicates to select a group to compare.",
-                actionLabel = "Back",
-                onAction = onNavigateBack,
-                modifier = Modifier.padding(innerPadding)
-            )
-        } else {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No duplicate group to compare",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
                     .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.md),
+                    .padding(horizontal = Spacing.md)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                // Why matched badge & info
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                // Match Header Card
+                SafaiCard {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            CategoryBadge(group.category)
+                            Column {
+                                Text(
+                                    text = "Match Type: " + when (group.matchType) {
+                                        MatchType.EXACT_CONTENT -> "Identical content (SHA-256)"
+                                        MatchType.SIMILAR_IMAGE -> "Similar photo ${(group.score * 100).toInt()}%"
+                                        MatchType.SAME_AUDIO_TAGS -> "Same song tags"
+                                        MatchType.NAME_VARIATION -> "Name variation"
+                                    },
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${group.files.size} duplicate copies · ${Formatters.formatBytes(group.reclaimableBytes)} can be freed",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         ConfidenceBadge(group.score)
-                        Text(
-                            text = when (group.matchType) {
-                                MatchType.EXACT_CONTENT -> "Identical content (SHA-256)"
-                                MatchType.SIMILAR_IMAGE -> "Similar photo ${(group.score * 100).toInt()}%"
-                                MatchType.SAME_AUDIO_TAGS -> "Same song tags"
-                                MatchType.NAME_VARIATION -> "Name variation"
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
-
-                    Text(
-                        text = "Can free ${Formatters.formatBytes(group.reclaimableBytes)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
 
-                // Media Preview Section
+                // Waveform Variance Badge (for Audio)
+                if (group.category == MediaCategory.AUDIO && group.files.size >= 2) {
+                    val fileA = group.files[0].file
+                    val fileB = group.files[1].file
+                    WaveformDifferenceBadge(fileA = fileA, fileB = fileB)
+                }
+
+                // Category-Specific Preview
                 when (group.category) {
                     MediaCategory.AUDIO -> {
                         AudioComparePreview(
@@ -179,7 +190,8 @@ fun CompareScreen(
                             playerState = playerState,
                             onSelectIndex = { coordinator.select(it, keepPosition = true) },
                             onTogglePlay = { coordinator.toggle() },
-                            onSeek = { coordinator.seek(it) }
+                            onSeek = { coordinator.seek(it) },
+                            onEditTags = { fileForTagEdit = it }
                         )
                     }
                     MediaCategory.IMAGE -> {
@@ -194,7 +206,7 @@ fun CompareScreen(
                             onOpenFile = { file -> openExternalFile(context, file) }
                         )
                     }
-                    else -> {
+                    MediaCategory.DOCUMENT, MediaCategory.ARCHIVE, MediaCategory.APK, MediaCategory.OTHER -> {
                         DocComparePreview(
                             files = group.files.map { it.file },
                             onOpenFile = { file -> openExternalFile(context, file) }
@@ -209,7 +221,8 @@ fun CompareScreen(
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("File Path", path))
                         onShowSnackbar("Path copied to clipboard")
-                    }
+                    },
+                    onEditTags = { file -> fileForTagEdit = file }
                 )
 
                 // Actions Card
@@ -283,6 +296,20 @@ fun CompareScreen(
             }
         }
     }
+
+    // Tag Editor Dialog
+    if (fileForTagEdit != null) {
+        MetadataEditorDialog(
+            mediaFile = fileForTagEdit!!,
+            onSave = { path, title, artist, album ->
+                viewModel.updateMetadata(path, title, artist, album) {
+                    onShowSnackbar("Updated tags for ${fileForTagEdit!!.name}")
+                }
+                fileForTagEdit = null
+            },
+            onDismiss = { fileForTagEdit = null }
+        )
+    }
 }
 
 private fun openExternalFile(context: Context, file: MediaFile) {
@@ -306,11 +333,30 @@ private fun AudioComparePreview(
     playerState: PlayerCoordinator.UiState,
     onSelectIndex: (Int) -> Unit,
     onTogglePlay: () -> Unit,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    onEditTags: (MediaFile) -> Unit
 ) {
+    val activeFile = files.getOrNull(playerState.activeIndex) ?: files.firstOrNull()
+
     SafaiCard {
-        Text("Audio Preview & A/B Switching", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(Spacing.sm))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Synchronized Audio A/B Playback", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            if (activeFile != null) {
+                TextButton(
+                    onClick = { onEditTags(activeFile) },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Edit Tags", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.xs))
 
         // A / B Selector Tabs
         Row(
@@ -334,7 +380,7 @@ private fun AudioComparePreview(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Track $label",
+                            text = "Track $label (${file.extension.uppercase()})",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -349,7 +395,24 @@ private fun AudioComparePreview(
             }
         }
 
-        Spacer(Modifier.height(Spacing.md))
+        Spacer(Modifier.height(Spacing.sm))
+
+        // Active Track Waveform
+        if (activeFile != null) {
+            val otherFile = files.find { it.path != activeFile.path }
+            AudioWaveformVisualizer(
+                file = activeFile,
+                isPlaying = playerState.isPlaying,
+                progressMs = playerState.positionMs,
+                durationMs = playerState.durationMs.coerceAtLeast(activeFile.durationMs ?: 1000L),
+                onSeek = onSeek,
+                comparisonBaseFile = otherFile,
+                height = 36.dp,
+                barCount = 36
+            )
+        }
+
+        Spacer(Modifier.height(Spacing.xs))
 
         // Playhead Controls
         Row(
@@ -360,14 +423,14 @@ private fun AudioComparePreview(
             IconButton(
                 onClick = onTogglePlay,
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
             ) {
                 Icon(
                     imageVector = if (playerState.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = if (playerState.isPlaying) "Pause" else "Play",
-                    tint = Color.White
+                    tint = Color.Black
                 )
             }
 
@@ -436,15 +499,6 @@ private fun ImageComparePreview(
                                 translationY = offset.y
                             ),
                         contentScale = ContentScale.Fit
-                    )
-                    Text(
-                        text = "${file.width}×${file.height}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .padding(4.dp)
                     )
                 }
             }
@@ -555,7 +609,8 @@ private fun DocComparePreview(
 @Composable
 private fun ComparisonMatrixCard(
     group: DuplicateGroupUi,
-    onCopyPath: (String) -> Unit
+    onCopyPath: (String) -> Unit,
+    onEditTags: (MediaFile) -> Unit
 ) {
     val files = group.files.map { it.file }
     SafaiCard {
@@ -579,12 +634,23 @@ private fun ComparisonMatrixCard(
             MatrixRow("Title", files.map { it.title ?: "—" })
             MatrixRow("Artist", files.map { it.artist ?: "—" })
             MatrixRow("Album", files.map { it.album ?: "—" })
-        } else if (group.category == MediaCategory.IMAGE) {
-            MatrixRow("Resolution", files.map { "${it.width}×${it.height}" }, bestIndex = files.indices.maxByOrNull { (files[it].width ?: 0) * (files[it].height ?: 0) })
-        } else if (group.category == MediaCategory.VIDEO) {
-            MatrixRow("Resolution", files.map { "${it.width}×${it.height}" })
+            MatrixRow("Format", files.map { it.extension.uppercase() })
+        }
+
+        if (group.category == MediaCategory.IMAGE) {
+            MatrixRow("Resolution", files.map { if ((it.width ?: 0) > 0) "${it.width}×${it.height}" else "—" })
+            MatrixRow("Megapixels", files.map {
+                val mp = ((it.width ?: 0) * (it.height ?: 0)) / 1_000_000f
+                if (mp > 0) String.format("%.1f MP", mp) else "—"
+            }, bestIndex = files.indices.maxByOrNull { (files[it].width ?: 0) * (files[it].height ?: 0) })
+        }
+
+        if (group.category == MediaCategory.VIDEO) {
+            MatrixRow("Resolution", files.map { if ((it.width ?: 0) > 0) "${it.width}×${it.height}" else "—" })
             MatrixRow("Duration", files.map { Formatters.formatDuration(it.durationMs ?: 0L) })
         }
+
+        MatrixRow("SHA-256", files.map { it.fullHash?.take(10)?.plus("…") ?: "—" })
     }
 }
 
@@ -595,42 +661,44 @@ private fun MatrixRow(
     bestIndex: Int? = null,
     onCopy: ((String) -> Unit)? = null
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Bold
+            modifier = Modifier.width(90.dp)
         )
-        Spacer(Modifier.height(2.dp))
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
             values.forEachIndexed { index, value ->
-                val isBest = bestIndex != null && bestIndex == index
-                val areDiffering = values.distinct().size > 1
-                val bgColor = when {
-                    isBest -> Success.copy(alpha = 0.16f)
-                    areDiffering -> Warning.copy(alpha = 0.10f)
-                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
-                }
-
+                val isBest = bestIndex == index
                 Surface(
                     modifier = Modifier
                         .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
                         .then(if (onCopy != null) Modifier.clickable { onCopy(value) } else Modifier),
                     shape = RoundedCornerShape(8.dp),
-                    color = bgColor
+                    color = if (isBest) Success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, if (isBest) Success.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Text(
                         text = value,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isBest) Success else MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (isBest) FontWeight.Bold else FontWeight.Normal,
-                        maxLines = 2,
+                        color = if (isBest) Success else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                        textAlign = TextAlign.Center
                     )
                 }
             }

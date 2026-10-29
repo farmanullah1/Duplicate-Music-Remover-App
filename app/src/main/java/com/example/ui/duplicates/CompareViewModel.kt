@@ -107,6 +107,13 @@ class CompareViewModel(
         return true
     }
 
+    fun updateMetadata(path: String, title: String?, artist: String?, album: String?, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            fileRepository.updateFileMetadata(path, title, artist, album)
+            onComplete()
+        }
+    }
+
     fun markNotDuplicate(onFinished: () -> Unit) {
         val group = uiState.value.currentGroup ?: return
         viewModelScope.launch {

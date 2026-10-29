@@ -3,10 +3,10 @@ package com.example.ui.duplicates
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -26,6 +26,7 @@ import com.example.core.Formatters
 import com.example.domain.model.DuplicateGroupUi
 import com.example.domain.model.MatchType
 import com.example.domain.model.MediaCategory
+import com.example.domain.model.MediaFile
 import com.example.domain.model.MemberUi
 import com.example.ui.components.*
 import com.example.ui.theme.*
@@ -40,7 +41,11 @@ fun DuplicateGroupCard(
     onNotDuplicate: () -> Unit,
     onCleanGroup: () -> Unit,
     modifier: Modifier = Modifier,
-    onSelectStrategy: ((KeepStrategy) -> Unit)? = null
+    onSelectStrategy: ((KeepStrategy) -> Unit)? = null,
+    onEditTags: ((MediaFile) -> Unit)? = null,
+    currentlyPlayingPath: String? = null,
+    onTogglePlayAudio: ((MediaFile) -> Unit)? = null,
+    playingProgressMs: Long = 0L
 ) {
     val keeperMember = group.files.find { it.recommendedKeep } ?: group.files.first()
 
@@ -139,6 +144,14 @@ fun DuplicateGroupCard(
             }
         }
 
+        // Audio comparison badge if comparing multiple audio tracks
+        if (group.category == MediaCategory.AUDIO && group.files.size >= 2) {
+            Spacer(Modifier.height(Spacing.xs))
+            val fileA = group.files[0].file
+            val fileB = group.files[1].file
+            WaveformDifferenceBadge(fileA = fileA, fileB = fileB)
+        }
+
         Spacer(Modifier.height(Spacing.md))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(Spacing.xs))
@@ -146,11 +159,16 @@ fun DuplicateGroupCard(
         // File Rows
         group.files.forEach { member ->
             val isKeep = fileKeepOverrides[member.file.path] ?: member.recommendedKeep
+            val isAudioPlaying = currentlyPlayingPath == member.file.path
 
             DuplicateMemberRow(
                 member = member,
                 isKeep = isKeep,
-                onToggle = { onToggleKeep(member.file.path) }
+                onToggle = { onToggleKeep(member.file.path) },
+                onEditTags = onEditTags,
+                isPlayingAudio = isAudioPlaying,
+                onTogglePlayAudio = { onTogglePlayAudio?.invoke(member.file) },
+                playingProgressMs = if (isAudioPlaying) playingProgressMs else 0L
             )
             Spacer(Modifier.height(Spacing.xs))
         }
@@ -205,7 +223,11 @@ fun DuplicateGroupCard(
 private fun DuplicateMemberRow(
     member: MemberUi,
     isKeep: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onEditTags: ((MediaFile) -> Unit)? = null,
+    isPlayingAudio: Boolean = false,
+    onTogglePlayAudio: (() -> Unit)? = null,
+    playingProgressMs: Long = 0L
 ) {
     val file = member.file
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -274,10 +296,41 @@ private fun DuplicateMemberRow(
                     )
                 }
 
+                // Audio quick play audition button
+                if (file.category == MediaCategory.AUDIO && onTogglePlayAudio != null) {
+                    IconButton(
+                        onClick = onTogglePlayAudio,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (isPlayingAudio) Teal400 else MaterialTheme.colorScheme.surfaceContainerHighest)
+                    ) {
+                        Icon(
+                            imageVector = if (isPlayingAudio) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (isPlayingAudio) "Pause" else "Audition track",
+                            tint = if (isPlayingAudio) Color.Black else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
                 // KEEP / REMOVE Toggle Button
                 KeepRemoveToggle(
                     isKeep = isKeep,
                     onToggle = onToggle
+                )
+            }
+
+            // Audio Waveform Visualizer
+            if (file.category == MediaCategory.AUDIO) {
+                Spacer(Modifier.height(4.dp))
+                AudioWaveformVisualizer(
+                    file = file,
+                    isPlaying = isPlayingAudio,
+                    progressMs = playingProgressMs,
+                    durationMs = file.durationMs ?: 1000L,
+                    height = 24.dp,
+                    barCount = 30
                 )
             }
 
@@ -326,6 +379,18 @@ private fun DuplicateMemberRow(
                     }
                 }
             )
+
+            if (file.category == MediaCategory.AUDIO && onEditTags != null) {
+                DropdownMenuItem(
+                    text = { Text("Edit audio tags") },
+                    leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                    onClick = {
+                        showContextMenu = false
+                        onEditTags(file)
+                    }
+                )
+            }
+
             DropdownMenuItem(
                 text = { Text("Share") },
                 leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
@@ -346,6 +411,7 @@ private fun DuplicateMemberRow(
                     }
                 }
             )
+
             DropdownMenuItem(
                 text = { Text("Copy path") },
                 leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
@@ -356,6 +422,7 @@ private fun DuplicateMemberRow(
                     android.widget.Toast.makeText(context, "Path copied", android.widget.Toast.LENGTH_SHORT).show()
                 }
             )
+
             DropdownMenuItem(
                 text = { Text("File details") },
                 leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
@@ -385,8 +452,14 @@ private fun DuplicateMemberRow(
                     Text("Size: ${Formatters.formatBytes(file.sizeBytes)} (${file.sizeBytes} bytes)", style = MaterialTheme.typography.bodySmall)
                     Text("Modified: ${Formatters.formatDate(file.modifiedMs)}", style = MaterialTheme.typography.bodySmall)
                     Text("Type: ${file.mime ?: "Unknown"} (${file.category.name})", style = MaterialTheme.typography.bodySmall)
-                    if ((file.width ?: 0) > 0 && (file.height ?: 0) > 0) {
-                        Text("Dimensions: ${file.width} × ${file.height}", style = MaterialTheme.typography.bodySmall)
+                    if (!file.title.isNullOrBlank()) {
+                        Text("Title: ${file.title}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (!file.artist.isNullOrBlank()) {
+                        Text("Artist: ${file.artist}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (!file.album.isNullOrBlank()) {
+                        Text("Album: ${file.album}", style = MaterialTheme.typography.bodySmall)
                     }
                     if ((file.durationMs ?: 0L) > 0L) {
                         Text("Duration: ${Formatters.formatDuration(file.durationMs!!)}", style = MaterialTheme.typography.bodySmall)

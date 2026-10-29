@@ -21,6 +21,7 @@ import com.example.ui.home.HomeScreen
 import com.example.ui.junk.JunkScreen
 import com.example.ui.onboarding.OnboardingScreen
 import com.example.ui.recyclebin.RecycleBinScreen
+import com.example.ui.screens.AiMusicStudioScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.storage.StorageScreen
 import com.example.ui.theme.Motion
@@ -83,6 +84,7 @@ fun SafaiNavHost(
                 onNavigateToJunk = { navController.navigate(Route.Junk.path) },
                 onNavigateToStorage = { navController.navigate(Route.Storage.path) },
                 onNavigateToRecycleBin = { navController.navigate(Route.RecycleBin.path) },
+                onNavigateToStudio = { navController.navigate(Route.AiMusicStudio.path) },
                 onShowSnackbar = { showSnackbar(it) }
             )
         }
@@ -126,6 +128,13 @@ fun SafaiNavHost(
             val groupId = backStackEntry.arguments?.getString("groupId")?.toLongOrNull() ?: -1L
             CompareScreen(
                 groupId = groupId,
+                onNavigateBack = { navController.popBackStack() },
+                onShowSnackbar = { showSnackbar(it) }
+            )
+        }
+
+        composable(Route.AiMusicStudio.path) {
+            AiMusicStudioScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onShowSnackbar = { showSnackbar(it) }
             )

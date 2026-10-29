@@ -1,5 +1,6 @@
 package com.example.ui.duplicates
 
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -18,19 +19,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import com.example.R
 import com.example.core.Formatters
 import com.example.di.LocalAppContainer
 import com.example.di.viewModelFactory
 import com.example.domain.model.DuplicateGroupUi
 import com.example.domain.model.MediaCategory
+import com.example.domain.model.MediaFile
 import com.example.ui.components.*
 import com.example.ui.theme.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,10 +60,44 @@ fun DuplicatesScreen(
         })
     }
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
 
     var showSortMenu by remember { mutableStateOf(false) }
+    var fileToEditMetadata by remember { mutableStateOf<MediaFile?>(null) }
+
+    // Quick audition ExoPlayer
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Player.REPEAT_MODE_OFF
+        }
+    }
+    var currentlyPlayingPath by remember { mutableStateOf<String?>(null) }
+    var auditionProgressMs by remember { mutableLongStateOf(0L) }
+
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    currentlyPlayingPath = null
+                    auditionProgressMs = 0L
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
+    LaunchedEffect(currentlyPlayingPath) {
+        while (isActive && currentlyPlayingPath != null) {
+            auditionProgressMs = exoPlayer.currentPosition
+            delay(150)
+        }
+    }
 
     LaunchedEffect(initialCategory) {
         if (!initialCategory.isNullOrBlank()) {
@@ -137,6 +179,72 @@ fun DuplicatesScreen(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
                 )
             )
+
+            Spacer(Modifier.height(Spacing.xs))
+
+            // Batch Selection Action Presets Row
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                item {
+                    AssistChip(
+                        onClick = { viewModel.selectBestBitrate() },
+                        label = { Text("Keep Best Bitrate") },
+                        leadingIcon = { Icon(Icons.Rounded.Star, contentDescription = null, tint = Gold400, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = { viewModel.selectPurgeCopiesOldest() },
+                        label = { Text("Purge Copies (Keep Oldest)") },
+                        leadingIcon = { Icon(Icons.Rounded.History, contentDescription = null, tint = Teal400, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = { viewModel.selectKeepCompleteTags() },
+                        label = { Text("Keep Complete Tags") },
+                        leadingIcon = { Icon(Icons.Rounded.Label, contentDescription = null, tint = Violet400, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = { viewModel.selectKeepNewest() },
+                        label = { Text("Keep Newest") },
+                        leadingIcon = { Icon(Icons.Rounded.NewReleases, contentDescription = null, tint = Teal400, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = { viewModel.selectAllDuplicates() },
+                        label = { Text("Select All Duplicates") },
+                        leadingIcon = { Icon(Icons.Rounded.SelectAll, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = { viewModel.deselectAllDuplicates() },
+                        label = { Text("Deselect All") },
+                        leadingIcon = { Icon(Icons.Rounded.Deselect, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
+                    AssistChip(
+                        onClick = { viewModel.invertSelection() },
+                        label = { Text("Invert Selection") },
+                        leadingIcon = { Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            }
 
             Spacer(Modifier.height(Spacing.xs))
 
@@ -239,7 +347,7 @@ fun DuplicatesScreen(
                 }
             }
 
-            // Groups List / Empty State
+            // Groups List / Storage Breakdown Chart / Empty State
             if (uiState.filteredGroups.isEmpty()) {
                 if (uiState.allGroups.isEmpty()) {
                     EmptyState(
@@ -271,6 +379,17 @@ fun DuplicatesScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                     contentPadding = PaddingValues(bottom = if (uiState.totalSelectedCount > 0) 90.dp else 16.dp)
                 ) {
+                    // If viewing Audio duplicates, display StorageBreakdownChart
+                    if ((uiState.selectedCategory == null || uiState.selectedCategory == MediaCategory.AUDIO) && uiState.allAudioFiles.isNotEmpty()) {
+                        item {
+                            StorageBreakdownChart(
+                                allFiles = uiState.allAudioFiles,
+                                duplicateGroups = uiState.allGroups,
+                                onSelectFormatFilter = { fmt -> viewModel.setFormatFilter(fmt) }
+                            )
+                        }
+                    }
+
                     items(
                         items = visibleGroups,
                         key = { it.id }
@@ -304,7 +423,24 @@ fun DuplicatesScreen(
                             },
                             onSelectStrategy = { strategy ->
                                 viewModel.applyGroupStrategy(group, strategy)
-                            }
+                            },
+                            onEditTags = { file ->
+                                fileToEditMetadata = file
+                            },
+                            currentlyPlayingPath = currentlyPlayingPath,
+                            onTogglePlayAudio = { audioFile ->
+                                if (currentlyPlayingPath == audioFile.path) {
+                                    exoPlayer.stop()
+                                    currentlyPlayingPath = null
+                                } else {
+                                    currentlyPlayingPath = audioFile.path
+                                    val uri = if (audioFile.uri != null) Uri.parse(audioFile.uri) else Uri.fromFile(java.io.File(audioFile.path))
+                                    exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+                                    exoPlayer.prepare()
+                                    exoPlayer.playWhenReady = true
+                                }
+                            },
+                            playingProgressMs = auditionProgressMs
                         )
                     }
 
@@ -340,12 +476,26 @@ fun DuplicatesScreen(
             SelectionBottomBar(
                 count = uiState.totalSelectedCount,
                 size = uiState.totalSelectedBytes,
-                onClear = { viewModel.selectRecommendedForCertain() },
+                onClear = { viewModel.deselectAllDuplicates() },
                 onDelete = { viewModel.setReviewSheetOpen(true) },
                 modifier = Modifier.align(Alignment.BottomCenter),
                 label = "Review & Clean"
             )
         }
+    }
+
+    // Metadata Tag Editor Dialog
+    if (fileToEditMetadata != null) {
+        MetadataEditorDialog(
+            mediaFile = fileToEditMetadata!!,
+            onSave = { path, title, artist, album ->
+                viewModel.updateMetadata(path, title, artist, album) {
+                    onShowSnackbar("Updated tags for ${fileToEditMetadata!!.name}")
+                }
+                fileToEditMetadata = null
+            },
+            onDismiss = { fileToEditMetadata = null }
+        )
     }
 
     // Review Modal Bottom Sheet

@@ -34,6 +34,9 @@ interface ScannedFileDao {
 
     @Query("SELECT * FROM scanned_files WHERE fullHash = :h LIMIT 1")
     suspend fun getByHash(h: String): ScannedFileEntity?
+
+    @Query("UPDATE scanned_files SET title = :title, artist = :artist, album = :album WHERE path = :path")
+    suspend fun updateMetadata(path: String, title: String?, artist: String?, album: String?)
 }
 
 @Dao

@@ -7,6 +7,7 @@ import com.example.domain.model.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
+
 class FileRepository(
     private val scannedFileDao: ScannedFileDao,
     private val duplicateDao: DuplicateDao,
@@ -100,6 +101,16 @@ class FileRepository(
 
     suspend fun getScannedFile(path: String): MediaFile? = withContext(ioDispatcher) {
         scannedFileDao.get(path)?.toMediaFile()
+    }
+
+    suspend fun getAllAudioFiles(): List<MediaFile> = withContext(ioDispatcher) {
+        scannedFileDao.all()
+            .map { it.toMediaFile() }
+            .filter { it.category == MediaCategory.AUDIO }
+    }
+
+    suspend fun updateFileMetadata(path: String, title: String?, artist: String?, album: String?) = withContext(ioDispatcher) {
+        scannedFileDao.updateMetadata(path, title, artist, album)
     }
 
     fun openGroupCount(): Flow<Int> = duplicateDao.openGroupCount()

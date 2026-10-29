@@ -7,6 +7,7 @@
     <string name="tab_junk">Junk</string>
     <string name="tab_storage">Storage</string>
     <string name="tab_settings">Settings</string>
+    <string name="tab_studio">AI Studio</string>
 
     <!-- Shortcuts -->
     <string name="shortcut_scan">Scan</string>
