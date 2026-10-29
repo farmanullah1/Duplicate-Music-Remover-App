@@ -1,6 +1,6 @@
 {
-  "name": "Duplicate Music Remover",
-  "description": "Smart audio file scanner and duplicate detector with side-by-side comparison, audio preview, smart auto-recommendations, and built-in recycle bin.",
+  "name": "Safai",
+  "description": "Smart duplicate cleaner and storage analyzer with safe recycle bin, junk cleaning, and offline duplicate detection.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

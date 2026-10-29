@@ -1,0 +1,11 @@
+<resources>
+  <style name="Theme.Safai" parent="android:Theme.Material.NoActionBar">
+    <item name="android:windowBackground">#000000</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+  </style>
+  <style name="Theme.Safai.Splash" parent="Theme.Safai">
+    <item name="android:windowSplashScreenBackground">#000000</item>
+  </style>
+</resources>

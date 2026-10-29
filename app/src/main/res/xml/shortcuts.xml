@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut
+      android:shortcutId="scan"
+      android:enabled="true"
+      android:icon="@drawable/ic_shortcut_scan"
+      android:shortcutShortLabel="@string/shortcut_scan"
+      android:shortcutLongLabel="@string/shortcut_scan_long">
+    <intent
+        android:action="android.intent.action.VIEW"
+        android:targetPackage="com.aistudio.duplicatemusic.remover"
+        android:targetClass="com.example.MainActivity">
+      <extra android:name="route" android:value="scan" />
+    </intent>
+  </shortcut>
+  <shortcut
+      android:shortcutId="duplicates"
+      android:enabled="true"
+      android:icon="@drawable/ic_shortcut_copy"
+      android:shortcutShortLabel="@string/shortcut_duplicates"
+      android:shortcutLongLabel="@string/shortcut_duplicates_long">
+    <intent
+        android:action="android.intent.action.VIEW"
+        android:targetPackage="com.aistudio.duplicatemusic.remover"
+        android:targetClass="com.example.MainActivity">
+      <extra android:name="route" android:value="duplicates" />
+    </intent>
+  </shortcut>
+  <shortcut
+      android:shortcutId="junk"
+      android:enabled="true"
+      android:icon="@drawable/ic_shortcut_clean"
+      android:shortcutShortLabel="@string/shortcut_junk"
+      android:shortcutLongLabel="@string/shortcut_junk_long">
+    <intent
+        android:action="android.intent.action.VIEW"
+        android:targetPackage="com.aistudio.duplicatemusic.remover"
+        android:targetClass="com.example.MainActivity">
+      <extra android:name="route" android:value="junk" />
+    </intent>
+  </shortcut>
+</shortcuts>

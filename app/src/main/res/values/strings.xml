@@ -1,3 +1,165 @@
 <resources>
-    <string name="app_name">Duplicate Music Remover</string>
+    <string name="app_name">Safai</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_duplicates">Duplicates</string>
+    <string name="tab_junk">Junk</string>
+    <string name="tab_storage">Storage</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Shortcuts -->
+    <string name="shortcut_scan">Scan</string>
+    <string name="shortcut_scan_long">Scan for duplicates</string>
+    <string name="shortcut_duplicates">Duplicates</string>
+    <string name="shortcut_duplicates_long">View duplicate files</string>
+    <string name="shortcut_junk">Junk</string>
+    <string name="shortcut_junk_long">Clean junk files</string>
+
+    <!-- Notification Channels -->
+    <string name="channel_scan_progress_name">Scan Progress</string>
+    <string name="channel_scan_progress_desc">Shows ongoing file scanning and duplicate detection progress</string>
+    <string name="channel_cleanup_name">Cleaning and Reminders</string>
+    <string name="channel_cleanup_desc">Notifications for cleanup results and monthly reminders</string>
+
+    <!-- Widgets -->
+    <string name="widget_storage_title">Storage</string>
+    <string name="widget_storage_desc">Storage usage and reclaimable space</string>
+    <string name="widget_quick_actions_desc">Quick actions to scan, view duplicates, and clean junk</string>
+    <string name="widget_cleaned_desc">Total space freed and quick scan</string>
+    <string name="widget_used">used</string>
+    <string name="widget_free">%1$s free</string>
+    <string name="widget_tap_to_scan">Tap to scan</string>
+    <string name="widget_duplicates_line">%1$d duplicate groups · %2$s</string>
+    <string name="widget_never_scanned">Never scanned</string>
+    <string name="widget_today">Today</string>
+    <string name="widget_yesterday">Yesterday</string>
+    <string name="widget_days_ago">%1$d days ago</string>
+    <string name="widget_freed_so_far">Freed so far</string>
+    <string name="widget_last_scan">Last scan: %1$s</string>
+
+    <!-- Permissions -->
+    <string name="perm_all_files_title">Allow All Files Access</string>
+    <string name="perm_all_files_desc">To scan documents, archives, APKs and clean junk files, Safai needs All Files Access permission.</string>
+    <string name="perm_all_files_button">Grant in Settings</string>
+    <string name="perm_media_only_title">Media Access Granted</string>
+    <string name="perm_media_only_desc">Allow All files access to scan documents, find junk, and analyze full folder structures.</string>
+    <string name="perm_notifications_title">Notification Permission</string>
+    <string name="perm_notifications_desc">Safai needs notification access to show background scan progress and cleanup reminders.</string>
+
+    <!-- Home Screen -->
+    <string name="home_title">Safai</string>
+    <string name="home_smart_clean_title">Smart Clean</string>
+    <string name="home_smart_clean_subtitle">One tap to safely clean exact duplicates and temporary junk</string>
+    <string name="home_smart_clean_button">Smart Clean</string>
+    <string name="home_storage_title">Storage Breakdown</string>
+    <string name="home_storage_used_desc">%1$d%% used</string>
+    <string name="home_storage_free_desc">%1$s free of %2$s</string>
+    <string name="home_scan_hero_title">Find duplicates &amp; junk</string>
+    <string name="home_scan_hero_never">Never scanned</string>
+    <string name="home_scan_hero_last">Last scan: %1$s</string>
+    <string name="home_scan_button">Scan now</string>
+    <string name="home_scan_again">Scan again</string>
+    <string name="home_review_duplicates">Review duplicates</string>
+    <string name="home_cancel">Cancel</string>
+    <string name="home_unreadable_note">%1$d files could not be read</string>
+    <string name="home_total_freed">Total freed so far</string>
+    <string name="home_low_storage_banner">Storage is running low! Free up space now.</string>
+
+    <!-- Categories -->
+    <string name="cat_audio">Audio</string>
+    <string name="cat_image">Photos</string>
+    <string name="cat_video">Videos</string>
+    <string name="cat_document">Documents</string>
+    <string name="cat_archive">Archives</string>
+    <string name="cat_apk">APKs</string>
+    <string name="cat_other">Other</string>
+    <string name="cat_apps_system">Apps &amp; system</string>
+
+    <!-- Duplicates Screen -->
+    <string name="dup_search_hint">Search by name, folder, or artist…</string>
+    <string name="dup_select_recommended">Select recommended</string>
+    <string name="dup_review_and_clean">Review &amp; clean</string>
+    <string name="dup_keep">KEEP</string>
+    <string name="dup_remove">REMOVE</string>
+    <string name="dup_compare">Compare</string>
+    <string name="dup_not_duplicate">Not a duplicate</string>
+    <string name="dup_clean_group">Clean group</string>
+    <string name="dup_last_keep_error">At least one file must be kept</string>
+    <string name="dup_not_dup_snackbar">Won\'t show these together again</string>
+    <string name="dup_undo">Undo</string>
+    <string name="dup_empty_title">No duplicates found</string>
+    <string name="dup_empty_message">Your storage is clean of duplicate files!</string>
+    <string name="dup_empty_noscan_title">No scan yet</string>
+    <string name="dup_empty_noscan_message">Scan your storage to find duplicate files and reclaim space.</string>
+
+    <!-- Compare Screen -->
+    <string name="compare_title">Compare Files</string>
+    <string name="compare_group_pager">Group %1$d of %2$d</string>
+    <string name="compare_play">Play</string>
+    <string name="compare_pause">Pause</string>
+    <string name="compare_open">Open file</string>
+
+    <!-- Junk Screen -->
+    <string name="junk_tab_cleanup">Cleanup</string>
+    <string name="junk_tab_large">Large files</string>
+    <string name="junk_scan_button">Scan junk</string>
+    <string name="junk_scan_title">Clean junk files</string>
+    <string name="junk_scan_desc">Find temporary files, empty folders, and leftover app installers safely.</string>
+    <string name="junk_honest_footer">Safai only removes files it can actually delete. Other apps\' private caches are protected by Android.</string>
+    <string name="junk_clean_btn">Clean %1$s</string>
+
+    <!-- Storage Screen -->
+    <string name="storage_title">Storage Analyzer</string>
+    <string name="storage_analyze_btn">Analyze storage</string>
+    <string name="storage_internal">Internal storage</string>
+    <string name="storage_sd_card">SD card</string>
+    <string name="storage_folder_note">Android/data and Android/obb of other apps are protected by Android and excluded.</string>
+    <string name="storage_refresh_hint">Folder sizes changed — Refresh</string>
+
+    <!-- Recycle Bin -->
+    <string name="recycle_bin_title">Recycle Bin</string>
+    <string name="recycle_bin_retention">Auto-deleted after %1$d days</string>
+    <string name="recycle_bin_empty_btn">Empty bin</string>
+    <string name="recycle_bin_restore">Restore</string>
+    <string name="recycle_bin_delete_perm">Delete forever</string>
+    <string name="recycle_bin_empty_title">Recycle Bin is empty</string>
+    <string name="recycle_bin_empty_desc">Files you remove are safely held here for 30 days before permanent deletion.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_permissions">Permissions</string>
+    <string name="settings_section_scanning">Scanning</string>
+    <string name="settings_scan_audio">Scan audio files</string>
+    <string name="settings_scan_images">Scan photos &amp; images</string>
+    <string name="settings_scan_videos">Scan videos</string>
+    <string name="settings_scan_docs">Scan documents</string>
+    <string name="settings_scan_archives">Scan archives &amp; APKs</string>
+    <string name="settings_skip_hidden">Skip hidden folders</string>
+    <string name="settings_section_cleaning">Cleaning</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_history">Cleaning history</string>
+    <string name="settings_section_about">About Safai</string>
+    <string name="settings_export_csv">Export last scan to CSV</string>
+    <string name="settings_about_tagline">100% offline · no ads · no tracking</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Safai</string>
+    <string name="onboarding_welcome_subtitle">Clean, organize, and protect your storage safely.</string>
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_finish">Finish &amp; Start</string>
+
+    <!-- Plurals -->
+    <plurals name="files_count">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <plurals name="groups_count">
+        <item quantity="one">%1$d group</item>
+        <item quantity="other">%1$d groups</item>
+    </plurals>
+    <plurals name="days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
 </resources>
