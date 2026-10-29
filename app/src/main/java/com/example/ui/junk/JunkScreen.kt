@@ -200,7 +200,7 @@ fun JunkScreen(
                             .weight(1f)
                             .padding(horizontal = Spacing.md),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        contentPadding = PaddingValues(bottom = if (selectedBytes > 0) 96.dp else 24.dp)
+                        contentPadding = PaddingValues(bottom = if (selectedBytes > 0) 160.dp else 110.dp)
                     ) {
                         item {
                             SafaiCard(tonal = true) {
@@ -324,7 +324,7 @@ fun JunkScreen(
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                            contentPadding = PaddingValues(bottom = if (selectedLargeFiles.isNotEmpty()) 96.dp else 24.dp)
+                            contentPadding = PaddingValues(bottom = if (selectedLargeFiles.isNotEmpty()) 160.dp else 110.dp)
                         ) {
                             items(largeFiles, key = { it.path }) { item ->
                                 val isSelected = item.path in selectedLargeFiles
@@ -401,7 +401,9 @@ fun JunkScreen(
                     onClear = { /* deselect */ },
                     onDelete = { showConfirmDialog = true },
                     label = "Clean",
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 80.dp)
                 )
             }
         } else if (selectedTab == 1 && selectedLargeFiles.isNotEmpty()) {
@@ -416,7 +418,9 @@ fun JunkScreen(
                     }
                 },
                 label = "To Trash",
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp)
             )
         }
     }

@@ -246,7 +246,7 @@ fun StorageScreen(
                             .weight(1f)
                             .padding(horizontal = Spacing.md),
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 90.dp else 16.dp)
+                        contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 160.dp else 110.dp)
                     ) {
                         items(nodes, key = { it.path }) { node ->
                             val isSelected = node.path in uiState.selectedNodes
@@ -296,7 +296,9 @@ fun StorageScreen(
                     }
                 },
                 label = "To Trash",
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp)
             )
         }
     }

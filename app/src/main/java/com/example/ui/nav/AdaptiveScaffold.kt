@@ -146,30 +146,28 @@ fun AdaptiveScaffold(
             }
         }
         else -> {
-            // Compact: Floating bottom bar
-            Scaffold(
-                bottomBar = {
-                    if (isTopLevel) {
-                        FloatingBottomBar(
-                            currentRoute = currentRoute,
-                            onNavigate = onNavigateToDestination
-                        )
-                    }
-                },
-                snackbarHost = {
-                    Box(modifier = Modifier.padding(bottom = if (isTopLevel) Sizes.bottomBar + 16.dp else 0.dp)) {
-                        SnackbarHost(snackbarHostState)
-                    }
-                },
-                modifier = modifier
-            ) { innerPadding ->
-                val adjustedPadding = if (isTopLevel) {
-                    PaddingValues(
-                        top = innerPadding.calculateTopPadding(),
-                        bottom = innerPadding.calculateBottomPadding() + Sizes.bottomBar + 12.dp
+            // Compact: Floating bottom bar overlaid on content
+            Box(modifier = modifier.fillMaxSize()) {
+                Scaffold(
+                    snackbarHost = {
+                        Box(modifier = Modifier.padding(bottom = if (isTopLevel) Sizes.bottomBar + 28.dp else 16.dp)) {
+                            SnackbarHost(snackbarHostState)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) { innerPadding ->
+                    val topPadding = innerPadding.calculateTopPadding()
+                    val bottomPadding = if (isTopLevel) 0.dp else innerPadding.calculateBottomPadding()
+                    content(PaddingValues(top = topPadding, bottom = bottomPadding))
+                }
+
+                if (isTopLevel) {
+                    FloatingBottomBar(
+                        currentRoute = currentRoute,
+                        onNavigate = onNavigateToDestination,
+                        modifier = Modifier.align(Alignment.BottomCenter)
                     )
-                } else innerPadding
-                content(adjustedPadding)
+                }
             }
         }
     }
@@ -178,11 +176,12 @@ fun AdaptiveScaffold(
 @Composable
 fun FloatingBottomBar(
     currentRoute: String?,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),

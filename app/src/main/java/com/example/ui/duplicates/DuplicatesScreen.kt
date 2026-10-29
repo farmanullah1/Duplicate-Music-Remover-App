@@ -415,7 +415,7 @@ fun DuplicatesScreen(
                         .weight(1f)
                         .padding(horizontal = Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    contentPadding = PaddingValues(bottom = if (uiState.totalSelectedCount > 0) 90.dp else 16.dp)
+                    contentPadding = PaddingValues(bottom = if (uiState.totalSelectedCount > 0) 160.dp else 110.dp)
                 ) {
                     // If viewing Audio duplicates, display StorageBreakdownChart
                     if ((uiState.selectedCategory == null || uiState.selectedCategory == MediaCategory.AUDIO) && uiState.allAudioFiles.isNotEmpty()) {
@@ -526,7 +526,9 @@ fun DuplicatesScreen(
                         viewModel.setReviewSheetOpen(true)
                     }
                 },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp),
                 label = "Review & Clean"
             )
         }
