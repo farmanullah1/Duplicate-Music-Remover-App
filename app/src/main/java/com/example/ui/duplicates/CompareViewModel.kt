@@ -109,30 +109,46 @@ class CompareViewModel(
 
     fun updateMetadata(path: String, title: String?, artist: String?, album: String?, onComplete: () -> Unit) {
         viewModelScope.launch {
-            fileRepository.updateFileMetadata(path, title, artist, album)
-            onComplete()
+            try {
+                fileRepository.updateFileMetadata(path, title, artist, album)
+                onComplete()
+            } catch (t: Throwable) {
+                android.util.Log.e("CompareViewModel", "updateMetadata error", t)
+                onComplete()
+            }
         }
     }
 
     fun markNotDuplicate(onFinished: () -> Unit) {
         val group = uiState.value.currentGroup ?: return
         viewModelScope.launch {
-            fileRepository.markNotDuplicate(group)
-            onFinished()
+            try {
+                fileRepository.markNotDuplicate(group)
+                onFinished()
+            } catch (t: Throwable) {
+                android.util.Log.e("CompareViewModel", "markNotDuplicate error", t)
+            }
         }
     }
 
     fun cleanGroup(onFinished: (BatchResult) -> Unit) {
         val group = uiState.value.currentGroup ?: return
         viewModelScope.launch {
-            val overrides = _fileKeepOverrides.value
-            val filesToRemove = group.files.filter { m ->
-                !(overrides[m.file.path] ?: m.recommendedKeep)
-            }.map { it.file }
+            try {
+                val overrides = _fileKeepOverrides.value
+                val filesToRemove = group.files.filter { m ->
+                    !(overrides[m.file.path] ?: m.recommendedKeep)
+                }.map { it.file }
 
-            if (filesToRemove.isNotEmpty()) {
-                val result = trashUseCase.trashFromGroups(mapOf(group.id to filesToRemove))
-                onFinished(result)
+                if (filesToRemove.isNotEmpty()) {
+                    val result = trashUseCase.trashFromGroups(mapOf(group.id to filesToRemove))
+                    onFinished(result)
+                } else {
+                    onFinished(BatchResult(emptyList(), emptyList()))
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e("CompareViewModel", "cleanGroup error", t)
+                onFinished(BatchResult(emptyList(), emptyList()))
             }
         }
     }

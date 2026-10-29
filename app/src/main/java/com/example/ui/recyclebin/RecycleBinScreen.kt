@@ -54,6 +54,7 @@ fun RecycleBinScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showEmptyConfirm by remember { mutableStateOf(false) }
+    var showDeleteForeverConfirm by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onNavigateBack)
 
@@ -158,9 +159,7 @@ fun RecycleBinScreen(
                                 DangerButton(
                                     text = "Delete Forever",
                                     onClick = {
-                                        viewModel.deletePermanent(uiState.selectedIds.toList()) {
-                                            onShowSnackbar("Deleted selected files permanently")
-                                        }
+                                        showDeleteForeverConfirm = true
                                     },
                                     modifier = Modifier.height(40.dp)
                                 )
@@ -193,6 +192,37 @@ fun RecycleBinScreen(
                 }
             }
         }
+    }
+
+    if (showDeleteForeverConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteForeverConfirm = false },
+            icon = { Icon(Icons.Rounded.DeleteForever, contentDescription = null, tint = Danger) },
+            title = { Text("Delete Files Permanently?") },
+            text = {
+                Text(
+                    "Are you sure you want to permanently delete ${uiState.selectedIds.size} selected file(s)? This action cannot be undone."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteForeverConfirm = false
+                        viewModel.deletePermanent(uiState.selectedIds.toList()) {
+                            onShowSnackbar("Deleted selected files permanently")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete Permanently", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteForeverConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showEmptyConfirm) {

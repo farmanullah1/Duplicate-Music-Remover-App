@@ -40,7 +40,8 @@ class RecycleBinManager(
             return@withContext TrashOutcome.Fail(file.path, "Not enough free space for the Recycle Bin")
         }
 
-        val dest = File(fileOps.trashDir, "${UUID.randomUUID()}__${file.name}")
+        val safeName = file.name.replace('/', '_').replace('\\', '_').replace(':', '_').ifBlank { "file" }
+        val dest = File(fileOps.trashDir, "${UUID.randomUUID()}__${safeName}")
         try {
             fileOps.openStream(file).use { i ->
                 dest.outputStream().use { o ->
@@ -53,11 +54,21 @@ class RecycleBinManager(
                 return@withContext TrashOutcome.Fail(file.path, "Copy verification failed")
             }
 
-            if (file.uri == null) { // FULL mode
-                if (!src.delete()) {
-                    dest.delete()
-                    return@withContext TrashOutcome.Fail(file.path, "Could not delete original")
+            var deleted = false
+            if (file.uri != null) {
+                try {
+                    val count = ctx.contentResolver.delete(Uri.parse(file.uri), null, null)
+                    deleted = count > 0
+                } catch (e: Exception) {
                 }
+            }
+            if (!deleted && src.exists()) {
+                deleted = src.delete()
+            }
+
+            if (!deleted && file.uri == null) {
+                dest.delete()
+                return@withContext TrashOutcome.Fail(file.path, "Could not delete original file")
             }
 
             val e = RecycleBinEntity(
@@ -121,75 +132,47 @@ class RecycleBinManager(
         RestoreResult(restored, failed)
     }
 
-    private fun resolveRestoreDestination(item: RecycleBinEntity): File {
-        var dest = File(item.originalPath)
-        val parent = dest.parentFile
-        if (parent == null || (!parent.exists() && !parent.mkdirs())) {
-            val root = Environment.getExternalStorageDirectory()
-            val fallbackDirName = when (item.category) {
-                MediaCategory.AUDIO.name -> "Music/Restored"
-                MediaCategory.IMAGE.name -> "Pictures/Restored"
-                MediaCategory.VIDEO.name -> "Movies/Restored"
-                else -> "Documents/Restored"
-            }
-            dest = File(File(root, fallbackDirName), item.name)
-        }
-
-        // Avoid overwrite
-        if (dest.exists()) {
-            val base = item.name.substringBeforeLast('.')
-            val ext = if (item.name.contains('.')) "." + item.name.substringAfterLast('.') else ""
-            var counter = 1
-            var candidate = File(dest.parentFile, "$base (restored)$ext")
-            while (candidate.exists()) {
-                counter++
-                candidate = File(dest.parentFile, "$base (restored $counter)$ext")
-            }
-            dest = candidate
-        }
-
-        return dest
-    }
-
-    suspend fun deletePermanently(ids: List<Long>) = withContext(io) {
+    suspend fun purge(ids: List<Long>): Int = withContext(io) {
         val items = dao.byIds(ids)
+        var deleted = 0
         for (item in items) {
-            val f = File(item.trashPath)
-            if (f.exists()) f.delete()
+            try {
+                val f = File(item.trashPath)
+                if (f.exists()) f.delete()
+                deleted++
+            } catch (e: Exception) {
+            }
         }
         dao.delete(ids)
+        deleted
     }
 
-    suspend fun emptyBin() = withContext(io) {
-        val allFiles = fileOps.trashDir.listFiles() ?: emptyArray()
-        for (f in allFiles) {
-            f.delete()
-        }
-        val items = dao.items()
-        // Delete all rows in database
-        val allIds = dao.olderThan(Long.MAX_VALUE).map { it.id }
-        if (allIds.isNotEmpty()) {
-            dao.delete(allIds)
-        }
+    suspend fun purgeOlderThan(days: Int): Int = withContext(io) {
+        val cutoff = System.currentTimeMillis() - (days.toLong() * 86_400_000L)
+        val stale = dao.stale(cutoff)
+        purge(stale.map { it.id })
     }
 
-    suspend fun autoPurge(retentionDays: Int) = withContext(io) {
-        val cutoff = System.currentTimeMillis() - (retentionDays * 86_400_000L)
-        val expired = dao.olderThan(cutoff)
-        for (item in expired) {
-            val f = File(item.trashPath)
-            if (f.exists()) f.delete()
-        }
-        if (expired.isNotEmpty()) {
-            dao.delete(expired.map { it.id })
-        }
+    suspend fun emptyTrash(): Int = withContext(io) {
+        val all = dao.all()
+        purge(all.map { it.id })
+    }
 
-        // Clean orphans (files in trashDir without row)
-        val validTrashPaths = dao.olderThan(Long.MAX_VALUE).map { it.trashPath }.toSet()
-        fileOps.trashDir.listFiles()?.forEach { file ->
-            if (file.absolutePath !in validTrashPaths) {
-                file.delete()
-            }
+    private fun resolveRestoreDestination(item: RecycleBinEntity): File {
+        val target = File(item.originalPath)
+        if (!target.exists()) return target
+
+        val dir = target.parentFile ?: Environment.getExternalStorageDirectory()
+        val nameWithoutExt = item.name.substringBeforeLast('.')
+        val ext = item.name.substringAfterLast('.', "")
+        val dotExt = if (ext.isNotEmpty()) ".$ext" else ""
+
+        var counter = 1
+        var candidate = File(dir, "${nameWithoutExt}_restored$dotExt")
+        while (candidate.exists()) {
+            candidate = File(dir, "${nameWithoutExt}_restored_$counter$dotExt")
+            counter++
         }
+        return candidate
     }
 }

@@ -59,6 +59,7 @@ fun StorageScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showSortMenu by remember { mutableStateOf(false) }
+    var showConfirmTrashDialog by remember { mutableStateOf(false) }
 
     val hasFullAccess = StorageAccess.mode(context) == StorageAccess.Mode.FULL
 
@@ -250,7 +251,7 @@ fun StorageScreen(
                             .weight(1f)
                             .padding(horizontal = Spacing.md),
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 160.dp else 110.dp)
+                        contentPadding = PaddingValues(bottom = if (uiState.isSelectionMode) 80.dp else 16.dp)
                     ) {
                         items(nodes, key = { it.path }) { node ->
                             val isSelected = node.path in uiState.selectedNodes
@@ -286,6 +287,39 @@ fun StorageScreen(
             }
         }
 
+        if (showConfirmTrashDialog) {
+            val selectedNodes = uiState.index?.listing(uiState.currentPath, StorageSort.SIZE)?.filter { it.path in uiState.selectedNodes } ?: emptyList()
+            val totalBytes = selectedNodes.sumOf { it.bytes }
+            AlertDialog(
+                onDismissRequest = { showConfirmTrashDialog = false },
+                icon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = { Text("Move to Recycle Bin?") },
+                text = {
+                    Text(
+                        "Move ${uiState.selectedNodes.size} selected item(s) (${Formatters.formatBytes(totalBytes)}) to the Recycle Bin? You can restore them anytime within 30 days."
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showConfirmTrashDialog = false
+                            viewModel.moveSelectedToTrash { count ->
+                                onShowSnackbar("Moved $count items to Recycle Bin")
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("Move to Trash")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirmTrashDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
         // Selection Bottom Bar
         if (uiState.isSelectionMode) {
             val selectedNodes = uiState.index?.listing(uiState.currentPath, StorageSort.SIZE)?.filter { it.path in uiState.selectedNodes } ?: emptyList()
@@ -295,14 +329,12 @@ fun StorageScreen(
                 size = totalBytes,
                 onClear = { viewModel.clearSelection() },
                 onDelete = {
-                    viewModel.moveSelectedToTrash { count ->
-                        onShowSnackbar("Moved $count items to Recycle Bin")
-                    }
+                    showConfirmTrashDialog = true
                 },
                 label = "To Trash",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 80.dp)
+                    .padding(bottom = 12.dp)
             )
         }
     }

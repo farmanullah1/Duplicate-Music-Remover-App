@@ -121,7 +121,7 @@ fun HomeScreen(
             .fillMaxSize()
             .padding(horizontal = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        contentPadding = PaddingValues(bottom = 110.dp)
+        contentPadding = PaddingValues(bottom = 16.dp)
     ) {
         item { Spacer(Modifier.height(Spacing.xs)) }
 

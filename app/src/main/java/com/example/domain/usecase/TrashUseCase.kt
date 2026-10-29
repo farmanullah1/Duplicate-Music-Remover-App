@@ -48,77 +48,103 @@ class TrashUseCase(
         var done = 0
 
         for ((groupId, filesToRemove) in requests) {
-            val groupEntity = duplicateDao.getGroup(groupId)
-            val allMembers = duplicateDao.getMembers(groupId)
+            try {
+                val groupEntity = duplicateDao.getGroup(groupId)
+                val allMembers = duplicateDao.getMembers(groupId)
 
-            // Group-safety: ensure we never remove all members of a group
-            val remainingMembers = allMembers.filter { m -> filesToRemove.none { it.path == m.path } }
-            if (remainingMembers.isEmpty()) {
-                failed.add("Group #$groupId: At least one file must be kept")
-                done += filesToRemove.size
-                progress.value = done to total
-                continue
-            }
-
-            // For EXACT_CONTENT: verify that at least one keeper still exists on disk with matching size
-            if (groupEntity?.matchType == MatchType.EXACT_CONTENT.name) {
-                val expectedSize = filesToRemove.firstOrNull()?.sizeBytes ?: 0L
-                val keeperExists = remainingMembers.any { member ->
-                    val f = File(member.path)
-                    f.exists() && (expectedSize == 0L || f.length() == expectedSize)
-                }
-                if (!keeperExists) {
-                    failed.add("Group #$groupId: Keeper file is missing or modified on disk")
+                // Group-safety: ensure we never remove all members of a group
+                val remainingMembers = allMembers.filter { m -> filesToRemove.none { it.path == m.path } }
+                if (remainingMembers.isEmpty()) {
+                    failed.add("Group #$groupId: At least one file must be kept")
                     done += filesToRemove.size
                     progress.value = done to total
                     continue
                 }
-            }
 
-            for (file in filesToRemove) {
-                // Safety check: verify file is unchanged before touching it
-                if (file.uri == null) {
-                    val f = File(file.path)
-                    if (!f.exists()) {
-                        failed.add("${file.name}: Already gone")
-                        done++
-                        progress.value = done to total
-                        scannedFileDao.delete(file.path)
-                        duplicateDao.removeMemberByPath(file.path)
-                        continue
+                // For EXACT_CONTENT: verify that at least one keeper still exists on disk with matching size
+                if (groupEntity?.matchType == MatchType.EXACT_CONTENT.name) {
+                    val expectedSize = filesToRemove.firstOrNull()?.sizeBytes ?: 0L
+                    val keeperExists = remainingMembers.any { member ->
+                        if (member.path.startsWith("content://")) {
+                            true
+                        } else {
+                            val f = File(member.path)
+                            f.exists() && (expectedSize == 0L || f.length() == expectedSize)
+                        }
                     }
-                    if (f.length() != file.sizeBytes || f.lastModified() != file.modifiedMs) {
-                        failed.add("${file.name}: Changed since the scan — rescan to review it again")
-                        done++
+                    if (!keeperExists) {
+                        failed.add("Group #$groupId: Keeper file is missing or modified on disk")
+                        done += filesToRemove.size
                         progress.value = done to total
                         continue
                     }
                 }
 
-                val outcome = recycleBinManager.moveToTrash(file)
-                when (outcome) {
-                    is TrashOutcome.Ok -> {
-                        succeeded.add(outcome.entity)
-                        freedBytes += file.sizeBytes
-                        removedPaths.add(file.path)
-                        scannedFileDao.delete(file.path)
-                        duplicateDao.removeMemberByPath(file.path)
-                    }
-                    is TrashOutcome.Fail -> {
-                        failed.add("${file.name}: ${outcome.reason}")
+                for (file in filesToRemove) {
+                    try {
+                        // Safety check: verify file is unchanged before touching it
+                        if (file.uri == null && !file.path.startsWith("content://")) {
+                            val f = File(file.path)
+                            if (!f.exists()) {
+                                failed.add("${file.name}: Already gone")
+                                done++
+                                progress.value = done to total
+                                scannedFileDao.delete(file.path)
+                                duplicateDao.removeMemberByPath(file.path)
+                                continue
+                            }
+                            if (f.length() != file.sizeBytes || f.lastModified() != file.modifiedMs) {
+                                failed.add("${file.name}: Changed since the scan — rescan to review it again")
+                                done++
+                                progress.value = done to total
+                                continue
+                            }
+                        }
+
+                        val outcome = recycleBinManager.moveToTrash(file)
+                        when (outcome) {
+                            is TrashOutcome.Ok -> {
+                                succeeded.add(outcome.entity)
+                                freedBytes += file.sizeBytes
+                                removedPaths.add(file.path)
+                                scannedFileDao.delete(file.path)
+                                duplicateDao.removeMemberByPath(file.path)
+                            }
+                            is TrashOutcome.Fail -> {
+                                failed.add("${file.name}: ${outcome.reason}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        failed.add("${file.name}: ${e.localizedMessage ?: "Failed to clean"}")
+                    } finally {
+                        done++
+                        progress.value = done to total
                     }
                 }
-                done++
-                progress.value = done to total
+
+                // If fewer than 2 members remain, mark the duplicate group resolved
+                val remainingAfter = duplicateDao.getMembers(groupId)
+                if (remainingAfter.size < 2) {
+                    duplicateDao.resolve(groupId)
+                }
+            } catch (e: Exception) {
+                failed.add("Group #$groupId: ${e.localizedMessage ?: "Error processing group"}")
             }
         }
 
-        val latestSession = scanSessionDao.latestSnapshot()
-        if (latestSession != null) {
-            scanSessionDao.update(latestSession.copy(freedBytes = latestSession.freedBytes + freedBytes))
+        try {
+            val latestSession = scanSessionDao.latestSnapshot()
+            if (latestSession != null) {
+                scanSessionDao.update(latestSession.copy(freedBytes = latestSession.freedBytes + freedBytes))
+            }
+        } catch (e: Exception) {
         }
 
-        fileOps.rescan(removedPaths)
+        try {
+            fileOps.rescan(removedPaths)
+        } catch (e: Exception) {
+        }
+
         BatchResult(succeeded, failed, freedBytes)
     }
 
@@ -134,14 +160,14 @@ class TrashUseCase(
         var done = 0
         for (file in files) {
             try {
-                val f = File(file.path)
-                if (file.uri == null) {
+                if (file.uri == null && !file.path.startsWith("content://")) {
+                    val f = File(file.path)
                     if (!f.exists()) {
                         failed.add("${file.name}: Already gone")
-                        scannedFileDao.delete(file.path)
-                        duplicateDao.removeMemberByPath(file.path)
                         done++
                         progress.value = done to total
+                        scannedFileDao.delete(file.path)
+                        duplicateDao.removeMemberByPath(file.path)
                         continue
                     }
                     if (f.length() != file.sizeBytes || f.lastModified() != file.modifiedMs) {
@@ -150,44 +176,43 @@ class TrashUseCase(
                         progress.value = done to total
                         continue
                     }
+                    if (!f.delete()) {
+                        failed.add("${file.name}: Could not delete file")
+                        done++
+                        progress.value = done to total
+                        continue
+                    }
                 }
 
-                if (f.exists() && f.delete()) {
-                    freedBytes += file.sizeBytes
-                    removedPaths.add(file.path)
-                    scannedFileDao.delete(file.path)
-                    duplicateDao.removeMemberByPath(file.path)
-                } else if (!f.exists()) {
-                    scannedFileDao.delete(file.path)
-                    duplicateDao.removeMemberByPath(file.path)
-                } else {
-                    failed.add("${file.name}: Delete failed")
-                }
+                freedBytes += file.sizeBytes
+                removedPaths.add(file.path)
+                scannedFileDao.delete(file.path)
+                duplicateDao.removeMemberByPath(file.path)
             } catch (e: Exception) {
-                failed.add("${file.name}: ${e.message}")
+                failed.add("${file.name}: ${e.localizedMessage ?: "Delete failed"}")
+            } finally {
+                done++
+                progress.value = done to total
             }
-            done++
-            progress.value = done to total
         }
 
-        val latestSession = scanSessionDao.latestSnapshot()
-        if (latestSession != null) {
-            scanSessionDao.update(latestSession.copy(freedBytes = latestSession.freedBytes + freedBytes))
+        try {
+            val latestSession = scanSessionDao.latestSnapshot()
+            if (latestSession != null) {
+                scanSessionDao.update(latestSession.copy(freedBytes = latestSession.freedBytes + freedBytes))
+            }
+        } catch (e: Exception) {
         }
 
-        fileOps.rescan(removedPaths)
+        try {
+            fileOps.rescan(removedPaths)
+        } catch (e: Exception) {
+        }
+
         BatchResult(succeeded, failed, freedBytes)
     }
 
-    suspend fun restore(ids: List<Long>): RestoreResult {
-        return recycleBinManager.restore(ids)
-    }
-
-    suspend fun deletePermanentFromTrash(ids: List<Long>) {
-        recycleBinManager.deletePermanently(ids)
-    }
-
-    suspend fun emptyBin() {
-        recycleBinManager.emptyBin()
+    suspend fun restore(ids: List<Long>): RestoreResult = withContext(io) {
+        recycleBinManager.restore(ids)
     }
 }

@@ -2,6 +2,7 @@ package com.example.data.scan
 
 import java.io.InputStream
 import java.security.MessageDigest
+
 class Hasher {
     /** first 64KB + last 64KB + size, SHA-1. Cheap filter only. NEVER used to declare a duplicate. */
     fun quick(open: () -> InputStream, size: Long): String {
@@ -11,8 +12,11 @@ class Hasher {
             val buf = ByteArray(65536)
             val n1 = s.readFully(buf)
             md.update(buf, 0, n1)
-            if (size > 131072) {
-                s.skipFully(size - 131072 - n1)
+            if (size > 65536) {
+                val toSkip = (size - 65536) - n1
+                if (toSkip > 0) {
+                    s.skipFully(toSkip)
+                }
                 val n2 = s.readFully(buf)
                 md.update(buf, 0, n2)
             }

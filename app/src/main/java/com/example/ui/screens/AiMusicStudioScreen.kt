@@ -310,7 +310,8 @@ fun AiMusicStudioScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            contentPadding = PaddingValues(bottom = 32.dp)
         ) {
             // Hero Studio Header Card
             item {

@@ -123,44 +123,50 @@ class StorageViewModel(
 
     fun moveSelectedToTrash(onFinished: (Int) -> Unit) {
         viewModelScope.launch {
-            val selected = _uiState.value.selectedNodes
-            var moved = 0
-            for (p in selected) {
-                val f = File(p)
-                if (f.isFile) {
-                    val mediaFile = MediaFile(
-                        path = f.absolutePath,
-                        name = f.name,
-                        sizeBytes = f.length(),
-                        modifiedMs = f.lastModified(),
-                        category = MediaCategory.OTHER,
-                        mime = null,
-                        extension = f.name.substringAfterLast('.', "")
-                    )
-                    recycleBinManager.moveToTrash(mediaFile)
-                    moved++
-                } else if (f.isDirectory) {
-                    f.walkBottomUp().forEach { child ->
-                        if (child.isFile) {
-                            val mediaFile = MediaFile(
-                                path = child.absolutePath,
-                                name = child.name,
-                                sizeBytes = child.length(),
-                                modifiedMs = child.lastModified(),
-                                category = MediaCategory.OTHER,
-                                mime = null,
-                                extension = child.name.substringAfterLast('.', "")
-                            )
-                            recycleBinManager.moveToTrash(mediaFile)
-                            moved++
+            try {
+                val selected = _uiState.value.selectedNodes
+                var moved = 0
+                for (p in selected) {
+                    val f = File(p)
+                    if (f.isFile) {
+                        val mediaFile = MediaFile(
+                            path = f.absolutePath,
+                            name = f.name,
+                            sizeBytes = f.length(),
+                            modifiedMs = f.lastModified(),
+                            category = MediaCategory.OTHER,
+                            mime = null,
+                            extension = f.name.substringAfterLast('.', "")
+                        )
+                        recycleBinManager.moveToTrash(mediaFile)
+                        moved++
+                    } else if (f.isDirectory) {
+                        f.walkBottomUp().forEach { child ->
+                            if (child.isFile) {
+                                val mediaFile = MediaFile(
+                                    path = child.absolutePath,
+                                    name = child.name,
+                                    sizeBytes = child.length(),
+                                    modifiedMs = child.lastModified(),
+                                    category = MediaCategory.OTHER,
+                                    mime = null,
+                                    extension = child.name.substringAfterLast('.', "")
+                                )
+                                recycleBinManager.moveToTrash(mediaFile)
+                                moved++
+                            }
                         }
+                        f.deleteRecursively()
                     }
-                    f.deleteRecursively()
                 }
+                clearSelection()
+                analyze() // Refresh storage index
+                onFinished(moved)
+            } catch (t: Throwable) {
+                android.util.Log.e("StorageViewModel", "moveSelectedToTrash failed", t)
+                clearSelection()
+                onFinished(0)
             }
-            clearSelection()
-            analyze() // Refresh storage index
-            onFinished(moved)
         }
     }
 }

@@ -367,52 +367,65 @@ class DuplicatesViewModel(
 
     fun cleanGroup(group: DuplicateGroupUi, onFinished: (BatchResult) -> Unit) {
         viewModelScope.launch {
-            val overrides = _fileKeepOverrides.value
-            val filesToRemove = group.files.filter { m ->
-                !(overrides[m.file.path] ?: m.recommendedKeep)
-            }.map { it.file }
+            try {
+                val overrides = _fileKeepOverrides.value
+                val filesToRemove = group.files.filter { m ->
+                    !(overrides[m.file.path] ?: m.recommendedKeep)
+                }.map { it.file }
 
-            if (filesToRemove.isNotEmpty()) {
-                val res = trashUseCase.trashFromGroups(mapOf(group.id to filesToRemove))
-                onFinished(res)
+                if (filesToRemove.isNotEmpty()) {
+                    val res = trashUseCase.trashFromGroups(mapOf(group.id to filesToRemove))
+                    onFinished(res)
+                } else {
+                    onFinished(BatchResult(emptyList(), listOf("No duplicate files selected for removal"), 0L))
+                }
+            } catch (e: Exception) {
+                onFinished(BatchResult(emptyList(), listOf(e.localizedMessage ?: "Failed to clean group"), 0L))
             }
         }
     }
 
     fun cleanAllSelected(permanent: Boolean, onFinished: (BatchResult) -> Unit) {
         viewModelScope.launch {
-            val state = uiState.value
-            val overrides = state.fileKeepOverrides
-            val requests = mutableMapOf<Long, MutableList<MediaFile>>()
+            try {
+                val state = uiState.value
+                val overrides = state.fileKeepOverrides
+                val requests = mutableMapOf<Long, MutableList<MediaFile>>()
 
-            for (g in state.allGroups) {
-                val list = mutableListOf<MediaFile>()
-                for (m in g.files) {
-                    val isKeep = overrides[m.file.path] ?: m.recommendedKeep
-                    if (!isKeep) {
-                        list.add(m.file)
+                for (g in state.allGroups) {
+                    val list = mutableListOf<MediaFile>()
+                    for (m in g.files) {
+                        val isKeep = overrides[m.file.path] ?: m.recommendedKeep
+                        if (!isKeep) {
+                            list.add(m.file)
+                        }
+                    }
+                    if (list.isNotEmpty()) {
+                        requests[g.id] = list
                     }
                 }
-                if (list.isNotEmpty()) {
-                    requests[g.id] = list
+
+                _reviewSheetOpen.value = false
+
+                val result = if (permanent) {
+                    val flatFiles = requests.values.flatten()
+                    trashUseCase.deletePermanently(flatFiles)
+                } else {
+                    trashUseCase.trashFromGroups(requests)
                 }
+                onFinished(result)
+            } catch (e: Exception) {
+                onFinished(BatchResult(emptyList(), listOf(e.localizedMessage ?: "Failed to clean files"), 0L))
             }
-
-            _reviewSheetOpen.value = false
-
-            val result = if (permanent) {
-                val flatFiles = requests.values.flatten()
-                trashUseCase.deletePermanently(flatFiles)
-            } else {
-                trashUseCase.trashFromGroups(requests)
-            }
-            onFinished(result)
         }
     }
 
     fun undoTrash(ids: List<Long>) {
         viewModelScope.launch {
-            trashUseCase.restore(ids)
+            try {
+                trashUseCase.restore(ids)
+            } catch (e: Exception) {
+            }
         }
     }
 }

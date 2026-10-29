@@ -32,6 +32,13 @@ import com.example.ui.theme.Spacing
 
 val LocalWindowWidthSizeClass = staticCompositionLocalOf { WindowWidthSizeClass.Compact }
 
+fun matchesRoute(currentRoute: String?, targetRoute: String): Boolean {
+    if (currentRoute == null) return false
+    val c = currentRoute.substringBefore('?').substringBefore('/')
+    val t = targetRoute.substringBefore('?').substringBefore('/')
+    return c == t
+}
+
 data class TopLevelDestination(
     val route: String,
     val labelRes: Int,
@@ -57,7 +64,7 @@ fun AdaptiveScaffold(
     val widthClass = LocalWindowWidthSizeClass.current
     val haptic = LocalHapticFeedback.current
 
-    val isTopLevel = TOP_LEVEL_DESTINATIONS.any { it.route == currentRoute }
+    val isTopLevel = currentRoute != null && TOP_LEVEL_DESTINATIONS.any { matchesRoute(currentRoute, it.route) }
 
     when {
         widthClass == WindowWidthSizeClass.Expanded -> {
@@ -91,7 +98,7 @@ fun AdaptiveScaffold(
                             NavigationDrawerItem(
                                 icon = { Icon(dest.icon, contentDescription = null) },
                                 label = { Text(stringResource(dest.labelRes)) },
-                                selected = currentRoute == dest.route,
+                                selected = matchesRoute(currentRoute, dest.route),
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onNavigateToDestination(dest.route)
@@ -129,7 +136,7 @@ fun AdaptiveScaffold(
                         NavigationRailItem(
                             icon = { Icon(dest.icon, contentDescription = null) },
                             label = { Text(stringResource(dest.labelRes), fontSize = 11.sp) },
-                            selected = currentRoute == dest.route,
+                            selected = matchesRoute(currentRoute, dest.route),
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onNavigateToDestination(dest.route)
@@ -157,7 +164,7 @@ fun AdaptiveScaffold(
                     modifier = Modifier.fillMaxSize()
                 ) { innerPadding ->
                     val topPadding = innerPadding.calculateTopPadding()
-                    val bottomPadding = if (isTopLevel) 0.dp else innerPadding.calculateBottomPadding()
+                    val bottomPadding = if (isTopLevel) Sizes.bottomBar + 16.dp else innerPadding.calculateBottomPadding()
                     content(PaddingValues(top = topPadding, bottom = bottomPadding))
                 }
 
@@ -204,7 +211,7 @@ fun FloatingBottomBar(
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 TOP_LEVEL_DESTINATIONS.forEach { dest ->
-                    val selected = currentRoute == dest.route
+                    val selected = matchesRoute(currentRoute, dest.route)
                     val tint by animateColorAsState(
                         targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         label = "icon_tint"

@@ -109,18 +109,6 @@ fun SafaiNavHost(
             )
         }
 
-        composable(Route.Duplicates.path) {
-            DuplicatesScreen(
-                initialCategory = null,
-                onNavigateToCompare = { groupId ->
-                    navController.navigate(Route.Compare.go(groupId))
-                },
-                onNavigateToScan = { navController.navigate(Route.Home.path) },
-                onShowSnackbarWithAction = { msg, act, fn -> showSnackbarWithAction(msg, act, fn) },
-                onShowSnackbar = { showSnackbar(it) }
-            )
-        }
-
         composable(
             route = Route.Compare().path,
             arguments = listOf(navArgument("groupId") { type = NavType.StringType })

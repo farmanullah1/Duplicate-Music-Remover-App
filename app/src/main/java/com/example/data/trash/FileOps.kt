@@ -13,16 +13,34 @@ import java.io.InputStream
 class FileOps(private val ctx: Context) {
     val trashDir: File get() = File(ctx.filesDir, "recycle_bin").apply { mkdirs() }
 
-    fun openStream(f: MediaFile): InputStream =
-        if (f.uri != null) ctx.contentResolver.openInputStream(Uri.parse(f.uri))!! else FileInputStream(f.path)
+    fun openStream(f: MediaFile): InputStream {
+        if (f.uri != null) {
+            try {
+                val stream = ctx.contentResolver.openInputStream(Uri.parse(f.uri))
+                if (stream != null) return stream
+            } catch (e: Exception) {
+                // fallback to direct path
+            }
+        }
+        return FileInputStream(f.path)
+    }
 
-    fun freeBytes(): Long = StatFs(Environment.getExternalStorageDirectory().path).availableBytes
-    fun totalBytes(): Long = StatFs(Environment.getExternalStorageDirectory().path).totalBytes
+    fun freeBytes(): Long = runCatching {
+        StatFs(Environment.getExternalStorageDirectory().path).availableBytes
+    }.getOrDefault(0L)
+
+    fun totalBytes(): Long = runCatching {
+        StatFs(Environment.getExternalStorageDirectory().path).totalBytes
+    }.getOrDefault(1L)
 
     /** Tell the system gallery/music apps about added/removed files. */
     fun rescan(paths: List<String>) {
-        if (paths.isNotEmpty()) {
-            MediaScannerConnection.scanFile(ctx, paths.toTypedArray(), null, null)
+        val validPaths = paths.filter { it.isNotBlank() }
+        if (validPaths.isNotEmpty()) {
+            try {
+                MediaScannerConnection.scanFile(ctx, validPaths.toTypedArray(), null, null)
+            } catch (e: Exception) {
+            }
         }
     }
 }

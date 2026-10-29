@@ -72,6 +72,7 @@ fun JunkScreen(
 
     var largeThresholdMb by remember { mutableIntStateOf(settings.largeFileThresholdMb) }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showConfirmLargeFilesDialog by remember { mutableStateOf(false) }
 
     val hasFullAccess = StorageAccess.mode(context) == StorageAccess.Mode.FULL
 
@@ -204,7 +205,7 @@ fun JunkScreen(
                             .weight(1f)
                             .padding(horizontal = Spacing.md),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        contentPadding = PaddingValues(bottom = if (selectedBytes > 0) 160.dp else 110.dp)
+                        contentPadding = PaddingValues(bottom = if (selectedBytes > 0) 80.dp else 16.dp)
                     ) {
                         item {
                             SafaiCard(tonal = true) {
@@ -328,7 +329,7 @@ fun JunkScreen(
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                            contentPadding = PaddingValues(bottom = if (selectedLargeFiles.isNotEmpty()) 160.dp else 110.dp)
+                            contentPadding = PaddingValues(bottom = if (selectedLargeFiles.isNotEmpty()) 80.dp else 16.dp)
                         ) {
                             items(largeFiles, key = { it.path }) { item ->
                                 val isSelected = item.path in selectedLargeFiles
@@ -402,12 +403,12 @@ fun JunkScreen(
                 SelectionBottomBar(
                     count = selectedCount,
                     size = selectedBytes,
-                    onClear = { /* deselect */ },
+                    onClear = { viewModel.clearSelectedKinds() },
                     onDelete = { showConfirmDialog = true },
                     label = "Clean",
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 80.dp)
+                        .padding(bottom = 12.dp)
                 )
             }
         } else if (selectedTab == 1 && selectedLargeFiles.isNotEmpty()) {
@@ -415,18 +416,47 @@ fun JunkScreen(
             SelectionBottomBar(
                 count = selectedLargeFiles.size,
                 size = selectedBytes,
-                onClear = { /* deselect */ },
-                onDelete = {
-                    viewModel.trashLargeFiles(selectedLargeFiles) {
-                        onShowSnackbar("Moved large files to Recycle Bin")
-                    }
-                },
+                onClear = { viewModel.clearSelectedLargeFiles() },
+                onDelete = { showConfirmLargeFilesDialog = true },
                 label = "To Trash",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 80.dp)
             )
         }
+    }
+
+    // Confirm Dialog for Large Files
+    if (showConfirmLargeFilesDialog) {
+        val selectedBytes = largeFiles.filter { it.path in selectedLargeFiles }.sumOf { it.sizeBytes }
+        AlertDialog(
+            onDismissRequest = { showConfirmLargeFilesDialog = false },
+            icon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Move Large Files to Recycle Bin?") },
+            text = {
+                Text(
+                    "Move ${selectedLargeFiles.size} selected file(s) (${Formatters.formatBytes(selectedBytes)}) to the Recycle Bin? You can restore them anytime within 30 days."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmLargeFilesDialog = false
+                        viewModel.trashLargeFiles(selectedLargeFiles) {
+                            onShowSnackbar("Moved ${selectedLargeFiles.size} large files to Recycle Bin")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Move to Trash")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmLargeFilesDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Confirm Dialog for Junk Clean

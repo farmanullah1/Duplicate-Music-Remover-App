@@ -77,6 +77,7 @@ fun CompareScreen(
     val playerState by coordinator.state.collectAsStateWithLifecycle()
 
     var fileForTagEdit by remember { mutableStateOf<MediaFile?>(null) }
+    var showConfirmCleanDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -286,10 +287,7 @@ fun CompareScreen(
                         DangerButton(
                             text = "Clean REMOVE",
                             onClick = {
-                                viewModel.cleanGroup { batch ->
-                                    onShowSnackbar("Moved ${batch.succeeded.size} files to Recycle Bin")
-                                    onNavigateBack()
-                                }
+                                showConfirmCleanDialog = true
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -299,6 +297,49 @@ fun CompareScreen(
                 Spacer(Modifier.height(Spacing.xl))
             }
         }
+    }
+
+    if (showConfirmCleanDialog && group != null) {
+        val overrides = uiState.fileKeepOverrides
+        val filesToRemove = group.files.filter { m ->
+            !(overrides[m.file.path] ?: m.recommendedKeep)
+        }
+        val bytesToFree = filesToRemove.sumOf { it.file.size }
+        AlertDialog(
+            onDismissRequest = { showConfirmCleanDialog = false },
+            title = { Text("Move to Recycle Bin?") },
+            text = {
+                Text(
+                    "Are you sure you want to move " + filesToRemove.size + " file(s) (" +
+                        Formatters.formatBytes(bytesToFree) +
+                        ") to the Recycle Bin? You can restore them anytime within 30 days."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmCleanDialog = false
+                        coordinator.pause()
+                        viewModel.cleanGroup { batch ->
+                            if (batch.succeeded.isNotEmpty()) {
+                                onShowSnackbar("Moved " + batch.succeeded.size + " file(s) to Recycle Bin")
+                            } else {
+                                onShowSnackbar("Could not remove files")
+                            }
+                            onNavigateBack()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clean Files")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmCleanDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Tag Editor Dialog

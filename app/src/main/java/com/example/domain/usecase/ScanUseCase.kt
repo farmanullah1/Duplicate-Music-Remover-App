@@ -80,14 +80,13 @@ class ScanUseCase(
                 coroutineContext.ensureActive()
                 val ext = stub.path.substringAfterLast('.', "")
                 val cat = FileTypes.categoryOf(ext)
-                if (cat == MediaCategory.OTHER) return@mapNotNull null
                 val enabled = when (cat) {
                     MediaCategory.AUDIO -> settings.scanAudio
                     MediaCategory.IMAGE -> settings.scanImages
                     MediaCategory.VIDEO -> settings.scanVideos
                     MediaCategory.DOCUMENT -> settings.scanDocuments
                     MediaCategory.ARCHIVE, MediaCategory.APK -> settings.scanArchivesApks
-                    else -> false
+                    MediaCategory.OTHER -> settings.scanArchivesApks
                 }
                 if (!enabled) return@mapNotNull null
                 if (stub.size < settings.minFileSizeKb * 1024L) return@mapNotNull null

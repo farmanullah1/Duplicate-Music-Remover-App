@@ -65,25 +65,43 @@ class RecycleBinViewModel(
 
     fun restore(ids: List<Long>, onFinished: (RestoreResult) -> Unit) {
         viewModelScope.launch {
-            val result = recycleBinManager.restore(ids)
-            clearSelection()
-            onFinished(result)
+            try {
+                val result = recycleBinManager.restore(ids)
+                clearSelection()
+                onFinished(result)
+            } catch (t: Throwable) {
+                android.util.Log.e("RecycleBinViewModel", "restore error", t)
+                clearSelection()
+                onFinished(RestoreResult(0, ids.size))
+            }
         }
     }
 
     fun deletePermanent(ids: List<Long>, onFinished: () -> Unit) {
         viewModelScope.launch {
-            recycleBinManager.deletePermanently(ids)
-            clearSelection()
-            onFinished()
+            try {
+                recycleBinManager.deletePermanently(ids)
+                clearSelection()
+                onFinished()
+            } catch (t: Throwable) {
+                android.util.Log.e("RecycleBinViewModel", "deletePermanently error", t)
+                clearSelection()
+                onFinished()
+            }
         }
     }
 
     fun emptyBin(onFinished: () -> Unit) {
         viewModelScope.launch {
-            recycleBinManager.emptyBin()
-            clearSelection()
-            onFinished()
+            try {
+                recycleBinManager.emptyBin()
+                clearSelection()
+                onFinished()
+            } catch (t: Throwable) {
+                android.util.Log.e("RecycleBinViewModel", "emptyBin error", t)
+                clearSelection()
+                onFinished()
+            }
         }
     }
 }
