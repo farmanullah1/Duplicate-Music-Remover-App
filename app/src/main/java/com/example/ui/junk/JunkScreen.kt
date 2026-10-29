@@ -119,7 +119,7 @@ fun JunkScreen(
                 if (!hasFullAccess) {
                     PermissionCard(
                         title = stringResource(R.string.perm_all_files_title),
-                        text = "To find and clean temporary files, cache, and empty folders, All Files Access is required.",
+                        text = "To find and clean junk documents, temp files, cache, and empty folders, All Files Access is required.",
                         buttonLabel = stringResource(R.string.perm_all_files_button),
                         onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -192,13 +192,15 @@ fun JunkScreen(
                     // Category List
                     val selectedBytes = categories.filter { it.kind in selectedKinds }.sumOf { it.totalBytes }
                     val totalFoundBytes = categories.sumOf { it.totalBytes }
+                    val autoCategories = categories.filter { it.preselected }
+                    val reviewCategories = categories.filter { !it.preselected }
 
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = Spacing.md),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        contentPadding = PaddingValues(bottom = if (selectedBytes > 0) 90.dp else 16.dp)
+                        contentPadding = PaddingValues(bottom = if (selectedBytes > 0) 96.dp else 24.dp)
                     ) {
                         item {
                             SafaiCard(tonal = true) {
@@ -207,9 +209,9 @@ fun JunkScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f, fill = false)) {
                                         Text(
-                                            text = "Junk Files Detected",
+                                            text = "Junk & Cache Detected",
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -221,7 +223,8 @@ fun JunkScreen(
                                     }
                                     OutlinedButton(
                                         onClick = { viewModel.scanJunk() },
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = RoundedCornerShape(12.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                                     ) {
                                         Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(Sizes.iconSm))
                                         Spacer(Modifier.width(4.dp))
@@ -231,12 +234,44 @@ fun JunkScreen(
                             }
                         }
 
-                        items(categories) { cat ->
-                            JunkCategoryCard(
-                                category = cat,
-                                isSelected = cat.kind in selectedKinds,
-                                onToggle = { viewModel.toggleCategory(cat.kind) }
-                            )
+                        // Automatic categories
+                        if (autoCategories.isNotEmpty()) {
+                            items(autoCategories) { cat ->
+                                JunkCategoryCard(
+                                    category = cat,
+                                    isSelected = cat.kind in selectedKinds,
+                                    onToggle = { viewModel.toggleCategory(cat.kind) }
+                                )
+                            }
+                        }
+
+                        // Review categories (Unchecked by default)
+                        if (reviewCategories.isNotEmpty()) {
+                            item {
+                                Spacer(Modifier.height(Spacing.xs))
+                                Column {
+                                    Text(
+                                        text = "Review Before Cleaning",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "You decide — nothing here is pre-selected. Selected items move safely to Recycle Bin.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.height(Spacing.xxs))
+                            }
+
+                            items(reviewCategories) { cat ->
+                                JunkCategoryCard(
+                                    category = cat,
+                                    isSelected = cat.kind in selectedKinds,
+                                    onToggle = { viewModel.toggleCategory(cat.kind) }
+                                )
+                            }
                         }
 
                         item {
@@ -289,7 +324,7 @@ fun JunkScreen(
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                            contentPadding = PaddingValues(bottom = if (selectedLargeFiles.isNotEmpty()) 90.dp else 16.dp)
+                            contentPadding = PaddingValues(bottom = if (selectedLargeFiles.isNotEmpty()) 96.dp else 24.dp)
                         ) {
                             items(largeFiles, key = { it.path }) { item ->
                                 val isSelected = item.path in selectedLargeFiles
@@ -396,7 +431,7 @@ fun JunkScreen(
             text = {
                 Text(
                     "You are about to free approximately ${Formatters.formatBytes(selectedBytes)}.\n\n" +
-                    "Temporary and empty files will be deleted permanently. Any APK files or messaging media will be moved safely to your Recycle Bin."
+                    "Temporary files, cache, and empty folders will be deleted permanently. Any APK files, screenshots, old downloads, or messaging media will be moved safely to your Recycle Bin."
                 )
             },
             confirmButton = {
@@ -468,14 +503,16 @@ private fun JunkCategoryCard(
     var expanded by remember { mutableStateOf(false) }
 
     val (title, icon, color) = when (category.kind) {
-        JunkKind.TEMP_LOG -> Triple("Temporary & Log Files", Icons.Rounded.Description, CatDocument)
+        JunkKind.TEMP_LOG -> Triple("Junk Documents & Temp Logs", Icons.Rounded.Description, CatDocument)
         JunkKind.THUMBNAILS -> Triple("Cached Thumbnails", Icons.Rounded.Image, CatImage)
-        JunkKind.EMPTY_FILE -> Triple("Empty Files", Icons.Rounded.InsertDriveFile, CatOther)
+        JunkKind.EMPTY_FILE -> Triple("Empty Zero-Byte Files", Icons.Rounded.InsertDriveFile, CatOther)
         JunkKind.EMPTY_FOLDER -> Triple("Empty Folders", Icons.Rounded.Folder, CatArchive)
         JunkKind.INCOMPLETE_DOWNLOAD -> Triple("Incomplete Downloads", Icons.Rounded.Download, CatAudio)
         JunkKind.APP_CACHE -> Triple("App Cache", Icons.Rounded.Cached, Teal400)
         JunkKind.APK_INSTALLER -> Triple("Old APK Installers", Icons.Rounded.Android, CatApk)
         JunkKind.MESSAGING_MEDIA -> Triple("Old WhatsApp Media (>30d)", Icons.Rounded.Message, CatVideo)
+        JunkKind.SCREENSHOTS -> Triple("Old Screenshots (>30d)", Icons.Rounded.Screenshot, CatImage)
+        JunkKind.OLD_DOWNLOADS -> Triple("Old Downloads (>90d)", Icons.Rounded.FolderZip, CatArchive)
         else -> Triple(category.kind.name, Icons.Rounded.CleaningServices, CatOther)
     }
 
@@ -496,10 +533,18 @@ private fun JunkCategoryCard(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${category.items.size} items · ${Formatters.formatBytes(category.totalBytes)}",
+                        text = if (category.kind == JunkKind.EMPTY_FOLDER) {
+                            "${category.items.size} empty folders"
+                        } else if (category.kind == JunkKind.EMPTY_FILE) {
+                            "${category.items.size} zero-byte files"
+                        } else {
+                            "${category.items.size} items · ${Formatters.formatBytes(category.totalBytes)}"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -523,18 +568,37 @@ private fun JunkCategoryCard(
                 category.items.take(20).forEach { item ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Row(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (category.kind == JunkKind.EMPTY_FOLDER) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FolderOpen,
+                                    contentDescription = null,
+                                    tint = CatArchive,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Text(
+                                text = File(item.path).name.ifEmpty { item.path },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            text = File(item.path).name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = Formatters.formatBytes(item.sizeBytes),
+                            text = if (category.kind == JunkKind.EMPTY_FOLDER) {
+                                if (item.nested > 0) "${item.nested} subdirs" else "empty"
+                            } else {
+                                Formatters.formatBytes(item.sizeBytes)
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

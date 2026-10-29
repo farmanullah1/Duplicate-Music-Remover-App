@@ -98,8 +98,13 @@ fun HomeScreen(
         viewModel.requestScan()
     }
 
+    var crashInfo by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         viewModel.refreshStats()
+        val (crashed, msg) = com.example.SafaiApp.checkAndClearCrashMarker(context)
+        if (crashed) {
+            crashInfo = msg ?: "Unexpected termination recovered"
+        }
     }
 
     LazyColumn(
@@ -161,6 +166,77 @@ fun HomeScreen(
                             contentDescription = "Recycle Bin",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                }
+            }
+        }
+
+        // Crash Recovery Banner
+        if (crashInfo != null) {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.md)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            Icon(Icons.Rounded.BugReport, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Safai Recovered from an Error",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Text(
+                                    text = "Crash detected: ${crashInfo}. Diagnostics were recorded safely to crash.log.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(Spacing.xs))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { crashInfo = null }) {
+                                Text("Dismiss", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    crashInfo = null
+                                    try {
+                                        val f = java.io.File(context.filesDir, "crash.log")
+                                        if (f.exists() && f.length() > 0) {
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Safai Crash Log")
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(intent, "Share crash log"))
+                                        }
+                                    } catch (e: Exception) {
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Share Crash Log", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                 }
             }

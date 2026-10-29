@@ -529,12 +529,30 @@ fun ThumbnailImage(
             )
         }
         MediaCategory.VIDEO -> {
-            AsyncImage(
-                model = file.uri ?: file.path,
-                contentDescription = file.name,
+            Box(
                 modifier = base,
-                contentScale = ContentScale.Crop
-            )
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = file.uri ?: file.path,
+                    contentDescription = file.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayCircle,
+                        contentDescription = "Video",
+                        tint = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier.size(size * 0.45f)
+                    )
+                }
+            }
         }
         MediaCategory.AUDIO -> {
             var albumArt by remember(file.path) { mutableStateOf<android.graphics.Bitmap?>(null) }

@@ -537,8 +537,10 @@ private fun VideoComparePreview(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    val res = if ((file.width ?: 0) > 0 && (file.height ?: 0) > 0) "${file.width}×${file.height} · " else ""
+                    val dur = file.durationMs?.let { Formatters.formatDuration(it) } ?: ""
                     Text(
-                        text = "${file.width}×${file.height} · " + Formatters.formatDuration(file.durationMs ?: 0L),
+                        text = if (res.isNotEmpty() || dur.isNotEmpty()) "$res$dur" else Formatters.formatBytes(file.sizeBytes),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

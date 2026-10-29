@@ -106,20 +106,53 @@ class JunkViewModel(
             val details = mutableListOf<Pair<String, Long>>()
             var totalFreed = 0L
 
+            val recycleBinKinds = setOf(
+                JunkKind.APK_INSTALLER,
+                JunkKind.MESSAGING_MEDIA,
+                JunkKind.SCREENSHOTS,
+                JunkKind.OLD_DOWNLOADS
+            )
+
             for (cat in categories) {
                 if (cat.kind in selected) {
                     var catFreed = 0L
-                    for (item in cat.items) {
-                        try {
+                    if (cat.kind in recycleBinKinds) {
+                        // Safe move to recycle bin
+                        val mediaFiles = cat.items.map { item ->
                             val f = File(item.path)
-                            if (f.exists()) {
-                                val s = item.sizeBytes
-                                val deleted = if (item.isDir) f.deleteRecursively() else f.delete()
-                                if (deleted) {
-                                    catFreed += s
-                                }
+                            val catType = when (cat.kind) {
+                                JunkKind.APK_INSTALLER -> MediaCategory.APK
+                                JunkKind.SCREENSHOTS -> MediaCategory.IMAGE
+                                JunkKind.OLD_DOWNLOADS -> MediaCategory.DOCUMENT
+                                JunkKind.MESSAGING_MEDIA -> MediaCategory.OTHER
+                                else -> MediaCategory.OTHER
                             }
-                        } catch (e: Exception) {
+                            MediaFile(
+                                path = item.path,
+                                name = f.name,
+                                sizeBytes = item.sizeBytes,
+                                modifiedMs = item.modifiedMs,
+                                category = catType,
+                                mime = null,
+                                extension = item.path.substringAfterLast('.', "")
+                            )
+                        }
+                        trashUseCase.trashFromGroups(mapOf(0L to mediaFiles))
+                        catFreed = cat.totalBytes
+                    } else {
+                        // Direct removal for temporary, cache, and empty files/folders
+                        for (item in cat.items) {
+                            try {
+                                val f = File(item.path)
+                                if (f.exists()) {
+                                    val s = item.sizeBytes
+                                    val deleted = if (item.isDir) f.deleteRecursively() else f.delete()
+                                    if (deleted) {
+                                        catFreed += s
+                                    }
+                                }
+                            } catch (e: Exception) {
+                            }
                         }
                     }
                     totalFreed += catFreed

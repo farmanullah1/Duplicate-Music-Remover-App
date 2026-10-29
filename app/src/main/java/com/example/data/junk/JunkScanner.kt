@@ -28,7 +28,11 @@ class JunkScanner(
         "Alarms", "Notifications", "Ringtones", "Podcasts", "Android", "Recordings"
     )
 
-    private val tempExtensions = setOf("tmp", "temp", "log", "bak", "old", "chk", "dmp", "~")
+    private val tempExtensions = setOf(
+        "tmp", "temp", "log", "bak", "old", "chk", "dmp", "~",
+        "wbk", "asd", "xlk", "crash", "stackdump", "err", "inprogress", "part"
+    )
+
     private val incompleteExtensions = setOf("crdownload", "part", "partial", "download", "opdownload")
 
     suspend fun scan(
@@ -41,17 +45,20 @@ class JunkScanner(
         val incompleteItems = mutableListOf<JunkItem>()
         val apkItems = mutableListOf<JunkItem>()
         val messagingItems = mutableListOf<JunkItem>()
+        val screenshotItems = mutableListOf<JunkItem>()
+        val oldDownloadItems = mutableListOf<JunkItem>()
 
         val roots = scanner.roots()
         val rootPaths = roots.map { it.absolutePath }.toSet()
 
         val allDirs = mutableListOf<File>()
-        val filesInDir = mutableMapOf<File, Int>()
 
         val now = System.currentTimeMillis()
         val oneDayAgo = now - 24 * 3600 * 1000L
         val thirtyDaysAgo = now - 30L * 86_400_000L
         val threeDaysAgo = now - 3L * 86_400_000L
+        val screenshotCutoff = now - (settings.screenshotsDays.toLong().takeIf { it > 0 } ?: 30L) * 86_400_000L
+        val downloadCutoff = now - (settings.oldDownloadsDays.toLong().takeIf { it > 0 } ?: 90L) * 86_400_000L
 
         val stack = ArrayDeque<File>().apply { addAll(roots) }
 
@@ -59,14 +66,12 @@ class JunkScanner(
             coroutineContext.ensureActive()
             val dir = stack.removeLast()
             allDirs.add(dir)
-            filesInDir[dir] = 0
 
             val p = dir.absolutePath
             if (scanner.shouldSkipDir(dir, p, settings)) continue
 
             onProgress(p)
-            val children = dir.listFiles() ?: continue
-            var fileCountInDir = 0
+            val children = runCatching { dir.listFiles() }.getOrNull() ?: continue
 
             for (f in children) {
                 if (f.isDirectory) {
@@ -74,7 +79,6 @@ class JunkScanner(
                         stack.addLast(f)
                     }
                 } else if (f.isFile) {
-                    fileCountInDir++
                     val name = f.name
                     val ext = name.substringAfterLast('.', "").lowercase()
                     val size = f.length()
@@ -85,8 +89,14 @@ class JunkScanner(
                         emptyFileItems.add(JunkItem(f.absolutePath, 0L, mod, JunkKind.EMPTY_FILE))
                     }
 
-                    // Temp & Log
-                    if (ext in tempExtensions || name.startsWith("~$") || name.startsWith(".thumbdata")) {
+                    // Temp & Log Documents
+                    val isTempName = name.startsWith("~$") ||
+                            name.startsWith(".thumbdata") ||
+                            name.equals("thumbs.db", ignoreCase = true) ||
+                            name.equals(".DS_Store", ignoreCase = true) ||
+                            name.equals("desktop.ini", ignoreCase = true)
+
+                    if (ext in tempExtensions || isTempName) {
                         tempLogItems.add(JunkItem(f.absolutePath, size, mod, JunkKind.TEMP_LOG))
                     }
 
@@ -102,7 +112,7 @@ class JunkScanner(
                         incompleteItems.add(JunkItem(f.absolutePath, size, mod, JunkKind.INCOMPLETE_DOWNLOAD))
                     }
 
-                    // APK
+                    // APK installers
                     if (ext == "apk" && !p.contains("/Android/")) {
                         apkItems.add(JunkItem(f.absolutePath, size, mod, JunkKind.APK_INSTALLER))
                     }
@@ -115,23 +125,41 @@ class JunkScanner(
                             messagingItems.add(JunkItem(f.absolutePath, size, mod, JunkKind.MESSAGING_MEDIA))
                         }
                     }
+
+                    // Old Screenshots
+                    val isScreenshotFolder = p.contains("Screenshot", ignoreCase = true) ||
+                            p.contains("Screen recording", ignoreCase = true) ||
+                            p.contains("Screenrecorder", ignoreCase = true)
+                    if (isScreenshotFolder && mod < screenshotCutoff) {
+                        screenshotItems.add(JunkItem(f.absolutePath, size, mod, JunkKind.SCREENSHOTS))
+                    }
+
+                    // Old Downloads (>90d by default, excluding APKs and partial downloads)
+                    val isDownloadFolder = p.contains("/Download", ignoreCase = true) && !p.contains("/Android/")
+                    if (isDownloadFolder && mod < downloadCutoff && ext != "apk" && ext !in incompleteExtensions) {
+                        oldDownloadItems.add(JunkItem(f.absolutePath, size, mod, JunkKind.OLD_DOWNLOADS))
+                    }
                 }
             }
-            filesInDir[dir] = fileCountInDir
         }
 
         // Empty folders (deepest first post-order)
         val emptyDirs = HashSet<File>()
         for (d in allDirs.asReversed()) {
-            val subs = d.listFiles()?.filter { it.isDirectory } ?: emptyList()
-            if ((filesInDir[d] ?: 0) == 0 && subs.all { it in emptyDirs }) {
+            val children = runCatching { d.listFiles() }.getOrNull() ?: emptyArray()
+            val childFiles = children.filter { it.isFile }
+            val childDirs = children.filter { it.isDirectory }
+            if (childFiles.isEmpty() && childDirs.all { it in emptyDirs }) {
                 emptyDirs.add(d)
             }
         }
-        val topMostEmptyFolders = emptyDirs.filter {
-            it.parentFile !in emptyDirs && it.name !in protectedFolderNames && it.absolutePath !in rootPaths
-        }.map {
-            JunkItem(it.absolutePath, 0L, it.lastModified(), JunkKind.EMPTY_FOLDER, isDir = true)
+        val topMostEmptyFolders = emptyDirs.filter { dir ->
+            dir.parentFile !in emptyDirs &&
+            dir.name !in protectedFolderNames &&
+            dir.absolutePath !in rootPaths
+        }.map { dir ->
+            val nestedCount = emptyDirs.count { it != dir && it.absolutePath.startsWith(dir.absolutePath + File.separator) }
+            JunkItem(dir.absolutePath, 0L, dir.lastModified(), JunkKind.EMPTY_FOLDER, isDir = true, nested = nestedCount)
         }
 
         // App cache
@@ -148,7 +176,7 @@ class JunkScanner(
         addCacheFiles(ctx.cacheDir)
         addCacheFiles(ctx.externalCacheDir)
 
-        listOf(
+        val results = mutableListOf(
             JunkCategoryResult(JunkKind.TEMP_LOG, tempLogItems, tempLogItems.sumOf { it.sizeBytes }, preselected = true),
             JunkCategoryResult(JunkKind.THUMBNAILS, thumbnailItems, thumbnailItems.sumOf { it.sizeBytes }, preselected = true),
             JunkCategoryResult(JunkKind.EMPTY_FILE, emptyFileItems, 0L, preselected = true),
@@ -158,6 +186,15 @@ class JunkScanner(
             JunkCategoryResult(JunkKind.APK_INSTALLER, apkItems, apkItems.sumOf { it.sizeBytes }, preselected = false),
             JunkCategoryResult(JunkKind.MESSAGING_MEDIA, messagingItems, messagingItems.sumOf { it.sizeBytes }, preselected = false)
         )
+
+        if (screenshotItems.isNotEmpty()) {
+            results.add(JunkCategoryResult(JunkKind.SCREENSHOTS, screenshotItems, screenshotItems.sumOf { it.sizeBytes }, preselected = false))
+        }
+        if (oldDownloadItems.isNotEmpty()) {
+            results.add(JunkCategoryResult(JunkKind.OLD_DOWNLOADS, oldDownloadItems, oldDownloadItems.sumOf { it.sizeBytes }, preselected = false))
+        }
+
+        results
     }
 
     suspend fun findLargeFiles(

@@ -13,6 +13,8 @@ import com.example.di.DefaultAppContainer
 import com.example.service.CleanupReminderWorker
 import com.example.service.TrashPurgeWorker
 import com.example.widget.WidgetRefreshWorker
+import java.io.File
+import java.util.Date
 import java.util.concurrent.TimeUnit
 
 class SafaiApp : Application() {
@@ -23,13 +25,20 @@ class SafaiApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // 1. Crash Detection & Self-Debugging Local Logger
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             runCatching {
-                java.io.File(filesDir, "crash.log").apply {
-                    if (length() > 200_000) writeText("")
-                    appendText("--- ${java.util.Date()} thread=${t.name}\n${android.util.Log.getStackTraceString(e)}\n")
-                }
+                val crashFile = File(filesDir, "crash.log")
+                if (crashFile.length() > 200_000) crashFile.writeText("")
+                crashFile.appendText("--- ${Date()} thread=${t.name}\n${android.util.Log.getStackTraceString(e)}\n")
+
+                val prefs = getSharedPreferences(PREFS_CRASH, Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putBoolean(KEY_LAST_RUN_CRASHED, true)
+                    .putString(KEY_LAST_CRASH_MSG, e.localizedMessage ?: e.javaClass.simpleName)
+                    .putLong(KEY_LAST_CRASH_TIME, System.currentTimeMillis())
+                    .apply()
             }
             prev?.uncaughtException(t, e)
         }
@@ -50,6 +59,23 @@ class SafaiApp : Application() {
         // Monthly cleanup reminder
         val reminderRequest = PeriodicWorkRequestBuilder<CleanupReminderWorker>(1, TimeUnit.DAYS).build()
         workManager.enqueueUniquePeriodicWork("cleanup_reminder", ExistingPeriodicWorkPolicy.KEEP, reminderRequest)
+    }
+
+    companion object {
+        const val PREFS_CRASH = "safai_crash_prefs"
+        const val KEY_LAST_RUN_CRASHED = "last_run_crashed"
+        const val KEY_LAST_CRASH_MSG = "last_crash_msg"
+        const val KEY_LAST_CRASH_TIME = "last_crash_time"
+
+        fun checkAndClearCrashMarker(context: Context): Pair<Boolean, String?> {
+            val prefs = context.getSharedPreferences(PREFS_CRASH, Context.MODE_PRIVATE)
+            val crashed = prefs.getBoolean(KEY_LAST_RUN_CRASHED, false)
+            val msg = prefs.getString(KEY_LAST_CRASH_MSG, null)
+            if (crashed) {
+                prefs.edit().putBoolean(KEY_LAST_RUN_CRASHED, false).apply()
+            }
+            return (crashed to msg)
+        }
     }
 }
 
