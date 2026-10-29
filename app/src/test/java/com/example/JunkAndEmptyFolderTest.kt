@@ -25,7 +25,7 @@ class JunkAndEmptyFolderTest {
 
     @Test
     fun testJunkDocumentIdentification() {
-        assertTrue(isJunkDocument("~$Budget2026.docx"))
+        assertTrue(isJunkDocument("~" + '$' + "Budget2026.docx"))
         assertTrue(isJunkDocument("backup_data.bak"))
         assertTrue(isJunkDocument("error_dump.dmp"))
         assertTrue(isJunkDocument("system.log"))

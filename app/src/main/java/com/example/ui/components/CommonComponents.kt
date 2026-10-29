@@ -62,7 +62,7 @@ fun SafaiCard(
             )
         )
         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-        .then(if (onClick != null) Modifier.pressScaleClickable(onClick) else Modifier)
+        .then(if (onClick != null) Modifier.pressScaleClickable(onClick = onClick) else Modifier)
 
     Column(modifier.then(base).padding(Spacing.md), content = content)
 }
@@ -145,7 +145,7 @@ fun PrimaryButton(
         modifier = modifier
             .height(52.dp)
             .clip(shape)
-            .then(if (enabled) Modifier.pressScaleClickable(onClick) else Modifier),
+            .then(if (enabled) Modifier.pressScaleClickable(onClick = onClick) else Modifier),
         shape = shape,
         color = Color.Transparent
     ) {
@@ -192,7 +192,7 @@ fun DangerButton(
         modifier = modifier
             .height(52.dp)
             .clip(shape)
-            .then(if (enabled) Modifier.pressScaleClickable(onClick) else Modifier),
+            .then(if (enabled) Modifier.pressScaleClickable(onClick = onClick) else Modifier),
         shape = shape,
         color = Color.Transparent
     ) {
